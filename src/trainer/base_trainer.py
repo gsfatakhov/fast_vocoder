@@ -226,7 +226,7 @@ class BaseTrainer:
             if batch_idx % self.log_step == 0:
                 self.writer.set_step((epoch - 1) * self.epoch_len + batch_idx)
                 self.logger.debug(
-                    "Train Epoch: {} {} Gen Loss: {:.6f}, Desc Loss:".format(
+                    "Train Epoch: {} {} Gen Loss: {:.6f}, Desc Loss: {:.6f}".format(
                         epoch, self._progress(batch_idx), batch["loss_gen"].item(), batch["loss_disc"].item()
                     )
                 )
