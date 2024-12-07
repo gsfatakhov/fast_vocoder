@@ -20,7 +20,8 @@ class BaseTrainer:
         model,
         criterion,
         metrics,
-        optimizer,
+        gen_optimizer,
+        desc_optimizer,
         lr_scheduler,
         config,
         device,
@@ -68,7 +69,8 @@ class BaseTrainer:
 
         self.model = model
         self.criterion = criterion
-        self.optimizer = optimizer
+        self.gen_optimizer = gen_optimizer
+        self.desc_optimizer = desc_optimizer
         self.lr_scheduler = lr_scheduler
         self.batch_transforms = batch_transforms
 
@@ -224,8 +226,8 @@ class BaseTrainer:
             if batch_idx % self.log_step == 0:
                 self.writer.set_step((epoch - 1) * self.epoch_len + batch_idx)
                 self.logger.debug(
-                    "Train Epoch: {} {} Loss: {:.6f}".format(
-                        epoch, self._progress(batch_idx), batch["loss"].item()
+                    "Train Epoch: {} {} Gen Loss: {:.6f}, Desc Loss:".format(
+                        epoch, self._progress(batch_idx), batch["loss_gen"].item(), batch["loss_disc"].item()
                     )
                 )
                 self.writer.add_scalar(
@@ -467,7 +469,8 @@ class BaseTrainer:
             "arch": arch,
             "epoch": epoch,
             "state_dict": self.model.state_dict(),
-            "optimizer": self.optimizer.state_dict(),
+            "gen_optimizer": self.gen_optimizer.state_dict(),
+            "desc_optimizer": self.desc_optimizer.state_dict(),
             "lr_scheduler": self.lr_scheduler.state_dict(),
             "monitor_best": self.mnt_best,
             "config": self.config,

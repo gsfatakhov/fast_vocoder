@@ -46,9 +46,14 @@ def main(config):
     metrics = instantiate(config.metrics)
 
     # build optimizer, learning rate scheduler
-    trainable_params = filter(lambda p: p.requires_grad, model.parameters())
-    optimizer = instantiate(config.optimizer, params=trainable_params)
-    lr_scheduler = instantiate(config.lr_scheduler, optimizer=optimizer)
+    gen_trainable_params = filter(lambda p: p.requires_grad, model.generator.parameters())
+    gen_optimizer = instantiate(config.optimizer, params=gen_trainable_params)
+
+    desc_trainable_params = filter(lambda p: p.requires_grad, model.msd.parameters())
+    desc_optimizer = instantiate(config.optimizer, params=desc_trainable_params)
+
+    #TODO использую ген оптимайзер
+    lr_scheduler = instantiate(config.lr_scheduler, optimizer=gen_optimizer)
 
     # epoch_len = number of iterations for iteration-based training
     # epoch_len = None or len(dataloader) for epoch-based training
@@ -58,7 +63,8 @@ def main(config):
         model=model,
         criterion=loss_function,
         metrics=metrics,
-        optimizer=optimizer,
+        gen_optimizer=gen_optimizer,
+        desc_optimizer=desc_optimizer,
         lr_scheduler=lr_scheduler,
         config=config,
         device=device,

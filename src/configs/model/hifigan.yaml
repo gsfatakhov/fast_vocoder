@@ -1,0 +1,12 @@
+_target_: src.model.HiFiGAN
+generator_params:
+  in_channels: 80
+  upsample_rates: [8,8,2,2]
+  upsample_initial_channel: 512
+  resblock_kernel_sizes: [3, 7, 11]
+  resblock_dilation_sizes: [[1,3,5],[1,3,5],[1,3,5]]
+discriminator_params:
+  # Число дискриминаторов, типы и т.д.
+  num_scales: 3
+  scale_factor: 2
+  # Можно расширять конфиг по необходимости.

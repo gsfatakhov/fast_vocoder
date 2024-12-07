@@ -12,3 +12,8 @@ hydra-core
 black
 isort
 pre-commit
+
+torchaudio
+librosa
+pesq
+pystoi

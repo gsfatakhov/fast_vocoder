@@ -1,0 +1,6 @@
+train:
+  _target_: src.datasets.LJSpeechDataset
+  name: "train"
+  audio_path: "/Users/georgijfatahov/Downloads/LJSpeech-1.1"
+  index_audio_path: "/Users/georgijfatahov/Downloads/LJSpeech-1.1"
+  limit: 5

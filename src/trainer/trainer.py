@@ -1,5 +1,6 @@
 from src.metrics.tracker import MetricTracker
 from src.trainer.base_trainer import BaseTrainer
+import torch
 
 
 class Trainer(BaseTrainer):
@@ -8,51 +9,58 @@ class Trainer(BaseTrainer):
     """
 
     def process_batch(self, batch, metrics: MetricTracker):
-        """
-        Run batch through the model, compute metrics, compute loss,
-        and do training step (during training stage).
-
-        The function expects that criterion aggregates all losses
-        (if there are many) into a single one defined in the 'loss' key.
-
-        Args:
-            batch (dict): dict-based batch containing the data from
-                the dataloader.
-            metrics (MetricTracker): MetricTracker object that computes
-                and aggregates the metrics. The metrics depend on the type of
-                the partition (train or inference).
-        Returns:
-            batch (dict): dict-based batch containing the data from
-                the dataloader (possibly transformed via batch transform),
-                model outputs, and losses.
-        """
         batch = self.move_batch_to_device(batch)
-        batch = self.transform_batch(batch)  # transform batch on device -- faster
+        batch = self.transform_batch(batch)
 
         metric_funcs = self.metrics["inference"]
         if self.is_train:
             metric_funcs = self.metrics["train"]
-            self.optimizer.zero_grad()
 
-        outputs = self.model(**batch)
-        batch.update(outputs)
+            # 1. Обучение дискриминатора:
+            # Прогоняем модель в режиме detach для предсказаний (или внутри лосса учитываем detach)
+            with torch.no_grad():
+                outputs = self.model(**batch)  # pred_audio получаем
 
-        all_losses = self.criterion(**batch)
-        batch.update(all_losses)
+            batch.update(outputs)
+            all_losses = self.criterion(**batch)  # здесь лосс считается с detach для фейковых предсказаний
+            batch.update(all_losses)
 
-        if self.is_train:
-            batch["loss"].backward()  # sum of all losses is always called loss
+            self.desc_optimizer.zero_grad()
+            batch["loss_disc"].backward()
             self._clip_grad_norm()
-            self.optimizer.step()
+            self.desc_optimizer.step()
             if self.lr_scheduler is not None:
                 self.lr_scheduler.step()
 
-        # update metrics for each loss (in case of multiple losses)
+            # 2. Обучение генератора:
+            # Заново прогоняем модель, чтобы построить новый граф без detach
+            outputs = self.model(**batch)
+            batch.update(outputs)
+            all_losses = self.criterion(**batch)
+            batch.update(all_losses)
+
+            self.gen_optimizer.zero_grad()
+            batch["loss_gen"].backward()
+            self._clip_grad_norm()
+            self.gen_optimizer.step()
+            if self.lr_scheduler is not None:
+                self.lr_scheduler.step()
+
+        else:
+            # В режиме валидации:
+            outputs = self.model(**batch)
+            batch.update(outputs)
+            all_losses = self.criterion(self.model, **batch)
+            batch.update(all_losses)
+
+        # Логирование метрик и лоссов
         for loss_name in self.config.writer.loss_names:
-            metrics.update(loss_name, batch[loss_name].item())
+            if loss_name in batch:
+                metrics.update(loss_name, batch[loss_name].item())
 
         for met in metric_funcs:
             metrics.update(met.name, met(**batch))
+
         return batch
 
     def _log_batch(self, batch_idx, batch, mode="train"):
