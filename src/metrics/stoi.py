@@ -34,9 +34,16 @@ class STOI(BaseMetric):
         Returns:
             (float): STOI score averaged over the batch.
         """
+        # nuber of positive values in audios
+        # pos = sum([torch.sum(audio > 0).item() for audio in audio])
+        # neg = sum([torch.sum(audio < 0).item() for audio in audio])
+
+        # print("Last Positive values in audios:", pos)
+        # print("Last Negative values in audios:", neg)
+
         # make audio_ref and pred_audio same T
-        if audio.shape[-1] != pred_audio.shape[-1]:
-            min_len = min(audio.shape[-1], pred_audio.shape[-1])
-            audio = audio[..., :min_len]
-            pred_audio = pred_audio[..., :min_len]
+        # if audio.shape[-1] != pred_audio.shape[-1]:
+        #     min_len = min(audio.shape[-1], pred_audio.shape[-1])
+        #     audio = audio[..., :min_len]
+        #     pred_audio = pred_audio[..., :min_len]
         return self.metric(pred_audio, audio)

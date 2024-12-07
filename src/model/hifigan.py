@@ -1,9 +1,4 @@
-import torch
 import torch.nn as nn
-
-from dataclasses import dataclass
-import torchaudio
-import librosa
 
 ######################################################
 ## HiFi-GAN Generator
@@ -181,9 +176,9 @@ class HiFiGAN(nn.Module):
         Возвращаем:
         batch с "pred_audio": [B, 1, T']
         """
+        # print("Mel shape:", mel.shape)
         pred_audio = self.generator(mel)
         batch["pred_audio"] = pred_audio
-        batch["model"] = self
         return batch
 
     def discriminate(self, audio):
@@ -200,7 +195,7 @@ class HiFiGAN(nn.Module):
         )
 
         generator_parameters = sum([p.numel() for p in self.generator.parameters()])
-        discriminator_parameters = sum([p.numel() for p in self.discriminator.parameters()])
+        discriminator_parameters = sum([p.numel() for p in self.msd.parameters()])
 
         result_info = super().__str__()
         result_info = result_info + f"\nAll parameters: {all_parameters}"

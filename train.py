@@ -43,17 +43,17 @@ def main(config):
 
     # get function handles of loss and metrics
     loss_function = instantiate(config.loss_function).to(device)
+    loss_function.model = model
     metrics = instantiate(config.metrics)
 
     # build optimizer, learning rate scheduler
     gen_trainable_params = filter(lambda p: p.requires_grad, model.generator.parameters())
-    gen_optimizer = instantiate(config.optimizer, params=gen_trainable_params)
+    gen_optimizer = instantiate(config.gen_optimizer, params=gen_trainable_params)
+    gen_lr_scheduler = instantiate(config.gen_lr_scheduler, optimizer=gen_optimizer)
 
-    desc_trainable_params = filter(lambda p: p.requires_grad, model.msd.parameters())
-    desc_optimizer = instantiate(config.optimizer, params=desc_trainable_params)
-
-    #TODO использую ген оптимайзер
-    lr_scheduler = instantiate(config.lr_scheduler, optimizer=gen_optimizer)
+    disc_trainable_params = filter(lambda p: p.requires_grad, model.msd.parameters())
+    disc_optimizer = instantiate(config.disc_optimizer, params=disc_trainable_params)
+    disc_lr_scheduler = instantiate(config.disc_lr_scheduler, optimizer=disc_optimizer)
 
     # epoch_len = number of iterations for iteration-based training
     # epoch_len = None or len(dataloader) for epoch-based training
@@ -64,8 +64,9 @@ def main(config):
         criterion=loss_function,
         metrics=metrics,
         gen_optimizer=gen_optimizer,
-        desc_optimizer=desc_optimizer,
-        lr_scheduler=lr_scheduler,
+        gen_lr_scheduler=gen_lr_scheduler,
+        disc_optimizer=disc_optimizer,
+        disc_lr_scheduler=disc_lr_scheduler,
         config=config,
         device=device,
         dataloaders=dataloaders,

@@ -21,8 +21,9 @@ class BaseTrainer:
         criterion,
         metrics,
         gen_optimizer,
-        desc_optimizer,
-        lr_scheduler,
+        gen_lr_scheduler,
+        disc_optimizer,
+        disc_lr_scheduler,
         config,
         device,
         dataloaders,
@@ -70,8 +71,9 @@ class BaseTrainer:
         self.model = model
         self.criterion = criterion
         self.gen_optimizer = gen_optimizer
-        self.desc_optimizer = desc_optimizer
-        self.lr_scheduler = lr_scheduler
+        self.gen_lr_scheduler = gen_lr_scheduler
+        self.disc_optimizer = disc_optimizer
+        self.disc_lr_scheduler = disc_lr_scheduler
         self.batch_transforms = batch_transforms
 
         # define dataloaders
@@ -231,7 +233,10 @@ class BaseTrainer:
                     )
                 )
                 self.writer.add_scalar(
-                    "learning rate", self.lr_scheduler.get_last_lr()[0]
+                    "gen learning rate", self.gen_lr_scheduler.get_last_lr()[0]
+                )
+                self.writer.add_scalar(
+                    "disc learning rate", self.disc_lr_scheduler.get_last_lr()[0]
                 )
                 self._log_scalars(self.train_metrics)
                 self._log_batch(batch_idx, batch)
@@ -470,8 +475,9 @@ class BaseTrainer:
             "epoch": epoch,
             "state_dict": self.model.state_dict(),
             "gen_optimizer": self.gen_optimizer.state_dict(),
-            "desc_optimizer": self.desc_optimizer.state_dict(),
-            "lr_scheduler": self.lr_scheduler.state_dict(),
+            "gen_lr_scheduler": self.gen_lr_scheduler.state_dict(),
+            "disc_optimizer": self.disc_optimizer.state_dict(),
+            "disc_lr_scheduler": self.disc_lr_scheduler.state_dict(),
             "monitor_best": self.mnt_best,
             "config": self.config,
         }
@@ -516,8 +522,10 @@ class BaseTrainer:
 
         # load optimizer state from checkpoint only when optimizer type is not changed.
         if (
-            checkpoint["config"]["optimizer"] != self.config["optimizer"]
-            or checkpoint["config"]["lr_scheduler"] != self.config["lr_scheduler"]
+            checkpoint["config"]["gen_optimizer"] != self.config["gen_optimizer"]
+            or checkpoint["config"]["gen_lr_scheduler"] != self.config["gen_lr_scheduler"]
+            or checkpoint["config"]["disc_optimizer"] != self.config["disc_optimizer"]
+            or checkpoint["config"]["disc_lr_scheduler"] != self.config["disc_lr_scheduler"]
         ):
             self.logger.warning(
                 "Warning: Optimizer or lr_scheduler given in the config file is different "
@@ -525,8 +533,11 @@ class BaseTrainer:
                 "are not resumed."
             )
         else:
-            self.optimizer.load_state_dict(checkpoint["optimizer"])
-            self.lr_scheduler.load_state_dict(checkpoint["lr_scheduler"])
+            self.gen_optimizer.load_state_dict(checkpoint["gen_optimizer"])
+            self.gen_lr_scheduler.load_state_dict(checkpoint["gen_lr_scheduler"])
+
+            self.disc_optimizer.load_state_dict(checkpoint["disc_optimizer"])
+            self.disc_lr_scheduler.load_state_dict(checkpoint["disc_lr_scheduler"])
 
         self.logger.info(
             f"Checkpoint loaded. Resume training from epoch {self.start_epoch}"

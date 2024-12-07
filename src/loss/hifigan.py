@@ -20,8 +20,9 @@ class HiFiGANLoss(nn.Module):
         super().__init__()
         self.mel_extractor = MelSpectrogram(mel_config)
         self.l1 = nn.L1Loss()
+        self.model = None
 
-    def forward(self, model, **batch):
+    def forward(self, **batch):
         """
         Args:
             model: HiFiGAN модель, содержащая генератор и дискриминаторы.
@@ -49,17 +50,17 @@ class HiFiGANLoss(nn.Module):
 
         #TODO посмотреть на размеры спек
         # Обрезка (если требуется) до одинаковой длины:
-        min_len = min(mel_real.shape[-1], mel_pred.shape[-1])
-        mel_real = mel_real[..., :min_len]
-        mel_pred = mel_pred[..., :min_len]
+        # min_len = min(mel_real.shape[-1], mel_pred.shape[-1])
+        # mel_real = mel_real[..., :min_len]
+        # mel_pred = mel_pred[..., :min_len]
 
         # Mel reconstruction loss
         mel_loss = self.l1(mel_pred, mel_real)
 
         # Дискриминаторский лосс:
         # Для дискриминатора: мы хотим отличить real от fake
-        disc_real = model.discriminate(real_audio)  # list of (out, feats)
-        disc_fake = model.discriminate(pred_audio.detach())  # detach важен для дискриминатора
+        disc_real = self.model.discriminate(real_audio)  # list of (out, feats)
+        disc_fake = self.model.discriminate(pred_audio.detach())  # detach важен для дискриминатора
 
         disc_loss = 0.0
         for (f_out, _), (r_out, _) in zip(disc_fake, disc_real):
@@ -71,7 +72,7 @@ class HiFiGANLoss(nn.Module):
 
         # Генераторский лосс:
         # Генератору нужен adversarial лосс (хочет f_out ~ 1), feature matching loss и mel_loss
-        disc_fake_g = model.discriminate(pred_audio)  # без detach для градиентов в генератор
+        disc_fake_g = self.model.discriminate(pred_audio)  # без detach для градиентов в генератор
         adv_loss_gen = 0.0
         fm_loss = 0.0
 
@@ -80,9 +81,9 @@ class HiFiGANLoss(nn.Module):
             # Feature Matching: сравниваем промежуточные фичи
             for ff, rf in zip(f_feats, r_feats):
                 # TODO fix demensions
-                min_len = min(ff.shape[-1], rf.shape[-1])
-                ff = ff[..., :min_len]
-                rf = rf[..., :min_len]
+                # min_len = min(ff.shape[-1], rf.shape[-1])
+                # ff = ff[..., :min_len]
+                # rf = rf[..., :min_len]
 
                 fm_loss += F.l1_loss(ff, rf)
 

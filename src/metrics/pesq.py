@@ -1,4 +1,5 @@
 import torch
+from sympy import preorder_traversal
 
 from src.metrics.base_metric import BaseMetric
 from torchmetrics.audio.pesq import PerceptualEvaluationSpeechQuality
@@ -36,8 +37,15 @@ class PESQ(BaseMetric):
             (float): PESQ score averaged over the batch.
         """
         # make audio_ref and pred_audio same T
-        if audio.shape[-1] != pred_audio.shape[-1]:
-            min_len = min(audio.shape[-1], pred_audio.shape[-1])
-            audio = audio[..., :min_len]
-            pred_audio = pred_audio[..., :min_len]
+        # print("Pesq")
+        # print(audio.shape)
+        # print(pred_audio.shape)
+        # print()
+        # print(audio)
+        # print(pred_audio)
+        # print()
+        # if audio.shape[-1] != pred_audio.shape[-1]:
+        #     min_len = min(audio.shape[-1], pred_audio.shape[-1])
+        #     audio = audio[..., :min_len]
+        #     pred_audio = pred_audio[..., :min_len]
         return self.metric(pred_audio, audio)

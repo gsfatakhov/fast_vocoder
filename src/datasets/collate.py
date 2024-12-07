@@ -5,31 +5,23 @@ from src.utils.mel import MelSpectrogram, MelSpectrogramConfig
 def collate_fn(dataset_items: list[dict]):
     """
     Функция коллейта для LJSpeech датасета.
-    Ставит вместе несколько элементов датасета в батч,
-    дополняя аудио по длине до максимальной длины в батче.
-
-    Args:
-        dataset_items (list[dict]): список элементов из датасета LJSpeechDataset.
-
-    Returns:
-        dict: словарь с полями:
-            "audio" (Tensor): батч аудио [B, 1, T]
-            "text" (list[str]): список текстов
-            "audio_name" (list[str]): список имён аудио
+    Предполагается, что dataset уже возвращает аудио сегменты фиксированной длины segment_length.
+    Нам остаётся их просто склеить в батч, и посчитать мел-спектры.
     """
 
     audios = [item["audio"] for item in dataset_items]
     texts = [item["text"] for item in dataset_items]
     audio_names = [item["audio_name"] for item in dataset_items]
 
-    # Определяем максимальную длину аудио в батче
-    max_len = max([a.shape[-1] for a in audios])
+    # count positive and negative amplitudes in all audios
+    # nuber of positive values in audios
+    # pos = sum([torch.sum(audio > 0).item() for audio in audios])
+    # neg = sum([torch.sum(audio < 0).item() for audio in audios])
+    # print("Positive values in audios:", pos)
+    # print("Negative values in audios:", neg)
 
-    # Дополняем аудио нулями до максимальной длины
-    audios_padded = [F.pad(a, (0, max_len - a.shape[-1])) for a in audios]
 
-    # Ставим батч вместе
-    audio_batch = torch.stack(audios_padded, dim=0)  # [B, 1, T]
+    audio_batch = torch.stack(audios, dim=0)  # [B, 1, T]
 
     # Создаем мел-спектрограммы
 
@@ -37,10 +29,6 @@ def collate_fn(dataset_items: list[dict]):
     mel_extractor = MelSpectrogram(mel_config)
 
     mels = mel_extractor(audio_batch.squeeze(1))  # [B, n_mels, T']
-
-    # Check mels lentghs equal to audio lengths
-    # assert audio_batch.shape[-1] == mels.shape[-1]
-
 
     return {
         "audio": audio_batch,

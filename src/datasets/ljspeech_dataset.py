@@ -5,6 +5,9 @@ from pathlib import Path
 from src.datasets.base_dataset import BaseDataset
 from src.utils.io_utils import ROOT_PATH, read_json, write_json
 
+import torch
+import torch.nn.functional as F
+
 
 class LJSpeechDataset(BaseDataset):
     """
@@ -38,6 +41,7 @@ class LJSpeechDataset(BaseDataset):
             audio_path=ROOT_PATH / "data" / "ljspeech",
             index_audio_path=None,
             use_normalized_text=True,
+            segment_length=8192,
             *args, **kwargs
     ):
         """
@@ -55,6 +59,7 @@ class LJSpeechDataset(BaseDataset):
         self.target_sr = target_sr
         self.audio_path = Path(audio_path)
         self.use_normalized_text = use_normalized_text
+        self.segment_length = segment_length
 
         if not index_audio_path:
             index_audio_path = self.audio_path
@@ -94,6 +99,26 @@ class LJSpeechDataset(BaseDataset):
         audio_name = data_dict["audio_name"]
 
         audio_tensor = self.load_audio(audio_path)
+
+        # Если train, берём случайный отрезок segment_length
+        if self.name == "train":
+            if audio_tensor.shape[-1] >= self.segment_length:
+                max_start = audio_tensor.shape[-1] - self.segment_length
+                start = torch.randint(0, max_start+1, (1,)).item()
+                audio_tensor = audio_tensor[:, start:start+self.segment_length]
+            else:
+                # Если аудио короче segment_length, можно или пропустить, или дополнить нулями.
+                diff = self.segment_length - audio_tensor.shape[-1]
+                audio_tensor = F.pad(audio_tensor, (0, diff))
+
+        else:
+            # Для валидации/теста можно использовать, например, начальный отрезок
+            # или взять весь файл (тогда при collation будет паддинг)
+            if audio_tensor.shape[-1] > self.segment_length:
+                audio_tensor = audio_tensor[:, :self.segment_length]
+            else:
+                diff = self.segment_length - audio_tensor.shape[-1]
+                audio_tensor = F.pad(audio_tensor, (0, diff))
 
         instance_data = {
             "audio": audio_tensor,

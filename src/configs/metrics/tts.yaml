@@ -1,8 +1,8 @@
 device: "auto"
 train: # metrics that are calculated during training
-  - _target_: src.metrics.PESQ
-    device: ${metrics.device}
-    name: "PESQ"
+#  - _target_: src.metrics.PESQ
+#    device: ${metrics.device}
+#    name: "PESQ"
   - _target_: src.metrics.STOI
     device: ${metrics.device}
     name: "STOI"

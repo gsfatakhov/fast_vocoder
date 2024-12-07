@@ -1,6 +1,7 @@
 from src.metrics.tracker import MetricTracker
 from src.trainer.base_trainer import BaseTrainer
 import torch
+import random
 
 
 class Trainer(BaseTrainer):
@@ -25,12 +26,12 @@ class Trainer(BaseTrainer):
             all_losses = self.criterion(**batch)  # здесь лосс считается с detach для фейковых предсказаний
             batch.update(all_losses)
 
-            self.desc_optimizer.zero_grad()
+            self.disc_optimizer.zero_grad()
             batch["loss_disc"].backward()
             self._clip_grad_norm()
-            self.desc_optimizer.step()
-            if self.lr_scheduler is not None:
-                self.lr_scheduler.step()
+            self.disc_optimizer.step()
+            if self.disc_lr_scheduler is not None:
+                self.disc_lr_scheduler.step()
 
             # 2. Обучение генератора:
             # Заново прогоняем модель, чтобы построить новый граф без detach
@@ -43,14 +44,14 @@ class Trainer(BaseTrainer):
             batch["loss_gen"].backward()
             self._clip_grad_norm()
             self.gen_optimizer.step()
-            if self.lr_scheduler is not None:
-                self.lr_scheduler.step()
+            if self.gen_lr_scheduler is not None:
+                self.gen_lr_scheduler.step()
 
         else:
             # В режиме валидации:
             outputs = self.model(**batch)
             batch.update(outputs)
-            all_losses = self.criterion(self.model, **batch)
+            all_losses = self.criterion(**batch)
             batch.update(all_losses)
 
         # Логирование метрик и лоссов
@@ -84,4 +85,16 @@ class Trainer(BaseTrainer):
             pass
         else:
             # Log Stuff
-            pass
+            self._log_audio(batch)
+
+            # TODO visualize mel spectrograms
+            # self.writer.add_image("mel_real", mel_real)
+            # self.writer.add_image("mel_pred", mel_pred)
+
+    def _log_audio(self, batch):
+        self.writer.add_audio("audio_first", batch["audio"][0], 22050)
+        self.writer.add_audio("pred_audio_first", batch["pred_audio"][0], 22050)
+
+        i = random.randint(0, batch["audio"].size(0) - 1)
+        self.writer.add_audio("audio_random", batch["audio"][i], 22050)
+        self.writer.add_audio("pred_audio_random", batch["pred_audio"][i], 22050)
