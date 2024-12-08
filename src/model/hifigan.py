@@ -1,4 +1,7 @@
 import torch.nn as nn
+import torch
+
+from src.utils.mel import MelSpectrogramConfig, MelSpectrogram
 
 ######################################################
 ## HiFi-GAN Generator
@@ -131,13 +134,21 @@ class HiFiGANMultiScaleDiscriminator(nn.Module):
         return outs
 
 class HiFiGAN(nn.Module):
-    def __init__(self, generator_params, discriminator_params):
+    def __init__(self, generator_params, discriminator_params, calc_mel=False):
         super().__init__()
         self.generator = HiFiGANGenerator(**generator_params)
         self.msd = HiFiGANMultiScaleDiscriminator(**discriminator_params)
 
-    def forward(self, mel, **batch):
-        pred_audio = self.generator(mel)
+        self.calc_mel = calc_mel
+        if calc_mel:
+            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+            self.mel_config = MelSpectrogramConfig()
+            self.mel_extractor = MelSpectrogram(self.mel_config, device=device)
+
+    def forward(self, **batch):
+        if self.calc_mel and "mel" not in batch:
+            batch["mel"] = self.mel_extractor(batch["audio"]).squeeze(1)
+        pred_audio = self.generator(batch["mel"])
 
         if pred_audio[0].shape[-1] > batch["audio"].shape[-1]:
             pred_audio = pred_audio[..., :batch["audio"].shape[-1]]
