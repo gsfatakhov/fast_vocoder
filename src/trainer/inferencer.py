@@ -1,4 +1,5 @@
 import torch
+import torchaudio
 from tqdm.auto import tqdm
 
 from src.metrics.tracker import MetricTracker
@@ -7,48 +8,35 @@ from src.trainer.base_trainer import BaseTrainer
 
 class Inferencer(BaseTrainer):
     """
-    Inferencer (Like Trainer but for Inference) class
-
-    The class is used to process data without
-    the need of optimizers, writers, etc.
-    Required to evaluate the model on the dataset, save predictions, etc.
+    Inferencer для задачи ресинтеза/синтеза речи.
+    Вместо логитов и лейблов, работаем с аудио.
     """
 
     def __init__(
-        self,
-        model,
-        config,
-        device,
-        dataloaders,
-        save_path,
-        metrics=None,
-        batch_transforms=None,
-        skip_model_load=False,
+            self,
+            model,
+            config,
+            device,
+            dataloaders,
+            save_path,
+            metrics=None,
+            batch_transforms=None,
+            skip_model_load=False,
     ):
         """
-        Initialize the Inferencer.
-
         Args:
-            model (nn.Module): PyTorch model.
-            config (DictConfig): run config containing inferencer config.
-            device (str): device for tensors and model.
-            dataloaders (dict[DataLoader]): dataloaders for different
-                sets of data.
-            save_path (str): path to save model predictions and other
-                information.
-            metrics (dict): dict with the definition of metrics for
-                inference (metrics[inference]). Each metric is an instance
-                of src.metrics.BaseMetric.
-            batch_transforms (dict[nn.Module] | None): transforms that
-                should be applied on the whole batch. Depend on the
-                tensor name.
-            skip_model_load (bool): if False, require the user to set
-                pre-trained checkpoint path. Set this argument to True if
-                the model desirable weights are defined outside of the
-                Inferencer Class.
+            model (nn.Module): модель (например, HiFiGAN).
+            config (DictConfig): конфигурация ран-а.
+            device (str): устройство для тензоров и модели ("cpu" или "cuda").
+            dataloaders (dict[DataLoader]): Даталоадеры для разных частей (val, test и т.д.).
+            save_path (str): путь для сохранения результатов инференса.
+            metrics (dict): словарь метрик для оценки качества (например PESQ).
+            batch_transforms (dict[nn.Module] | None): трансформации для всего батча.
+            skip_model_load (bool): если False, требуется путь к чекпойнту;
+                                    если True, модель уже загружена снаружи.
         """
         assert (
-            skip_model_load or config.inferencer.get("from_pretrained") is not None
+                skip_model_load or config.inferencer.get("from_pretrained") is not None
         ), "Provide checkpoint or set skip_model_load=True"
 
         self.config = config
@@ -62,11 +50,8 @@ class Inferencer(BaseTrainer):
         # define dataloaders
         self.evaluation_dataloaders = {k: v for k, v in dataloaders.items()}
 
-        # path definition
-
         self.save_path = save_path
 
-        # define metrics
         self.metrics = metrics
         if self.metrics is not None:
             self.evaluation_metrics = MetricTracker(
@@ -77,16 +62,11 @@ class Inferencer(BaseTrainer):
             self.evaluation_metrics = None
 
         if not skip_model_load:
-            # init model
             self._from_pretrained(config.inferencer.get("from_pretrained"))
 
     def run_inference(self):
         """
-        Run inference on each partition.
-
-        Returns:
-            part_logs (dict): part_logs[part_name] contains logs
-                for the part_name partition.
+        Запустить инференс на каждом датасете, вернуть логи.
         """
         part_logs = {}
         for part, dataloader in self.evaluation_dataloaders.items():
@@ -96,87 +76,70 @@ class Inferencer(BaseTrainer):
 
     def process_batch(self, batch_idx, batch, metrics, part):
         """
-        Run batch through the model, compute metrics, and
-        save predictions to disk.
+        Прогоняем батч через модель, считаем метрики, сохраняем результаты.
 
-        Save directory is defined by save_path in the inference
-        config and current partition.
+        Предполагается, что batch имеет поля:
+        - "mel": [B, n_mels, T_mel]
+        - "audio": [B, 1, T]
 
-        Args:
-            batch_idx (int): the index of the current batch.
-            batch (dict): dict-based batch containing the data from
-                the dataloader.
-            metrics (MetricTracker): MetricTracker object that computes
-                and aggregates the metrics. The metrics depend on the type
-                of the partition (train or inference).
-            part (str): name of the partition. Used to define proper saving
-                directory.
-        Returns:
-            batch (dict): dict-based batch containing the data from
-                the dataloader (possibly transformed via batch transform)
-                and model outputs.
+        Модель добавит "pred_audio": [B, 1, T'] в batch.
+
+        Сохраняем результаты в wav формат.
         """
         batch = self.move_batch_to_device(batch)
-        batch = self.transform_batch(batch)  # transform batch on device -- faster
+        batch = self.transform_batch(batch)  # transform batch on device
 
+        # Прогоняем модель
         outputs = self.model(**batch)
         batch.update(outputs)
 
+        # Считаем метрики, если есть
         if metrics is not None:
             for met in self.metrics["inference"]:
                 metrics.update(met.name, met(**batch))
 
-        # Some saving logic. This is an example
-        # Use if you need to save predictions on disk
-
-        batch_size = batch["logits"].shape[0]
+        # Сохраняем результаты
+        # Создадим уникальный ID для каждого сэмпла
+        batch_size = batch["audio"].shape[0]
         current_id = batch_idx * batch_size
 
+        # Предполагается, что мы хотим сохранить предсказанное аудио
+        # в виде wav файлов. Чтобы сохранить, нужно знать sample_rate.
+        # Допустим, используем mel-config sr или вы храните sr в self.config.
+        sr = 22050
+
         for i in range(batch_size):
-            # clone because of
-            # https://github.com/pytorch/pytorch/issues/1995
-            logits = batch["logits"][i].clone()
-            label = batch["labels"][i].clone()
-            pred_label = logits.argmax(dim=-1)
+            pred_audio = batch["pred_audio"][i].clone().detach().cpu().squeeze(0)  # [T]
 
-            output_id = current_id + i
-
-            output = {
-                "pred_label": pred_label,
-                "label": label,
-            }
-
+            # Сохраняем wav
             if self.save_path is not None:
-                # you can use safetensors or other lib here
-                torch.save(output, self.save_path / part / f"output_{output_id}.pth")
+                out_path = self.save_path / part / f"{batch["audio_name"][i]}.wav"
+                out_path.parent.mkdir(parents=True, exist_ok=True)
+                torchaudio.save(str(out_path), pred_audio.unsqueeze(0), sr)
 
         return batch
 
     def _inference_part(self, part, dataloader):
         """
-        Run inference on a given partition and save predictions
+        Запуск инференса на заданной части датасета (например, 'val' или 'test').
 
-        Args:
-            part (str): name of the partition.
-            dataloader (DataLoader): dataloader for the given partition.
-        Returns:
-            logs (dict): metrics, calculated on the partition.
+        Возвращаем словарь метрик по итогам инференса.
         """
-
         self.is_train = False
         self.model.eval()
 
-        self.evaluation_metrics.reset()
+        if self.evaluation_metrics is not None:
+            self.evaluation_metrics.reset()
 
-        # create Save dir
+        # Создаем папку для сохранения результатов
         if self.save_path is not None:
             (self.save_path / part).mkdir(exist_ok=True, parents=True)
 
         with torch.no_grad():
             for batch_idx, batch in tqdm(
-                enumerate(dataloader),
-                desc=part,
-                total=len(dataloader),
+                    enumerate(dataloader),
+                    desc=part,
+                    total=len(dataloader),
             ):
                 batch = self.process_batch(
                     batch_idx=batch_idx,
@@ -185,4 +148,7 @@ class Inferencer(BaseTrainer):
                     metrics=self.evaluation_metrics,
                 )
 
-        return self.evaluation_metrics.result()
+        if self.evaluation_metrics is not None:
+            return self.evaluation_metrics.result()
+        else:
+            return {}

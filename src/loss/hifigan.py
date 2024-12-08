@@ -16,9 +16,9 @@ class HiFiGANLoss(nn.Module):
     - "loss_adv_gen": advarsarialный лосс генератора (входит в loss_gen)
     """
 
-    def __init__(self, mel_config=MelSpectrogramConfig()):
+    def __init__(self, mel_config=MelSpectrogramConfig(), device="cpu"):
         super().__init__()
-        self.mel_extractor = MelSpectrogram(mel_config)
+        self.mel_extractor = MelSpectrogram(mel_config, device=torch.device(device))
         self.l1 = nn.L1Loss()
         self.model = None
 

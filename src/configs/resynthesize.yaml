@@ -1,0 +1,13 @@
+defaults:
+  - model: hifigan
+  - metrics: tts
+  - datasets: test # we do not want to run inference on training data
+  - dataloader: train
+  - transforms: example_only_batch
+  - _self_
+inferencer:
+  device_tensors: ["audio", "mel"] # which tensors should be on device (ex. GPU)
+  device: auto # device name or "auto"
+  save_path: "resynthesize_results" # any name here, can be a dataset name
+  seed: 7
+  from_pretrained: "/home/georgii/Documents/model_best.pth" # path to the pretrained model

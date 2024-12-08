@@ -1,0 +1,6 @@
+test:
+  _target_: src.datasets.LJSpeechDataset
+  name: "test"
+  audio_path: "/home/georgii/PycharmProjects/vocoder_project/test_dataset"
+  index_audio_path: "/home/georgii/PycharmProjects/vocoder_project/test_dataset"
+  segment_length: 466944

@@ -7,10 +7,6 @@ import torch.nn as nn
 ######################################################
 
 class ResBlock(nn.Module):
-    """
-    ResBlock из HiFi-GAN (упрощённая версия Type1/Type2).
-    Используем список задаваемых расширений (dilations) и ядер (kernels).
-    """
     def __init__(self, channels, kernel_size, dilations):
         super().__init__()
         self.convs = nn.ModuleList()
@@ -34,14 +30,6 @@ class ResBlock(nn.Module):
 
 
 class HiFiGANGenerator(nn.Module):
-    """
-    Генератор HiFi-GAN.
-    Параметры:
-    - in_channels: количество мел-банок (обычно 80)
-    - upsample_rates: список апсэмплинг факторов
-    - upsample_initial_channel: начальное число каналов в ConvTranspose1d
-    - resblock_kernel_sizes, resblock_dilation_sizes: параметры ресблоков
-    """
     def __init__(
         self,
         in_channels=80,
@@ -68,15 +56,9 @@ class HiFiGANGenerator(nn.Module):
             )
             in_ch = in_ch // 2
 
-        # Для каждого апсэмплинга набор резблоков
+
         self.resblocks = nn.ModuleList()
         for i in range(len(self.ups)):
-            ch = in_ch * (2**(-i)) # или просто in_ch после апсэмплинга, но упрощаем
-            # фактически ch обновляется после каждого апсэмпла
-            # после апсэмпла in_ch уменьшился вдвое
-            # поэтому достать правильно текущий ch можно иначе:
-            # после всех апсэмплов in_ch = upsample_initial_channel // (2**len(upsample_rates))
-            # Для упрощения: текущий канал после i-го апсэмпла:
             current_ch = upsample_initial_channel // (2**(i+1))
 
             for (k, d) in zip(resblock_kernel_sizes, resblock_dilation_sizes):
@@ -90,11 +72,9 @@ class HiFiGANGenerator(nn.Module):
 
     def forward(self, x):
         x = self.input_conv(x)
-        rb_count = self.num_kernels * len(self.ups)
         idx = 0
         for i, up in enumerate(self.ups):
             x = up(x)
-            # Проходим по num_kernels ресблоков для этого апсэмплинга и усредняем результаты
             sum_rb = 0
             for _ in range(self.num_kernels):
                 sum_rb += self.resblocks[idx](x)
@@ -107,15 +87,9 @@ class HiFiGANGenerator(nn.Module):
 
 ######################################################
 ## HiFi-GAN Multi-Scale Discriminators
-## В статье HiFi-GAN используются Multi-Scale и Multi-Period дискриминаторы.
-## Здесь приведём Multi-Scale из статьи:
-## Три дискриминатора на разных временных масштабах.
 ######################################################
 
 class HiFiGANDiscriminatorScale(nn.Module):
-    """
-    Один дискриминатор для определённой шкалы.
-    """
     def __init__(self):
         super().__init__()
         self.model = nn.ModuleList([
@@ -156,12 +130,6 @@ class HiFiGANMultiScaleDiscriminator(nn.Module):
                 x = self.pooling(x)
         return outs
 
-
-######################################################
-## Полная модель HiFi-GAN (Generator + Multi-Scale Discriminator)
-## Можно добавить Multi-Period Discriminator по аналогии.
-######################################################
-
 class HiFiGAN(nn.Module):
     def __init__(self, generator_params, discriminator_params):
         super().__init__()
@@ -169,26 +137,16 @@ class HiFiGAN(nn.Module):
         self.msd = HiFiGANMultiScaleDiscriminator(**discriminator_params)
 
     def forward(self, mel, **batch):
-        """
-        batch ожидается с ключами:
-        "mel": [B, n_mels, T_mel]
-        "audio": [B, 1, T] - ground truth
-        Возвращаем:
-        batch с "pred_audio": [B, 1, T']
-        """
-        # print("Mel shape:", mel.shape)
-        # print("Audio shape:", batch["audio"].shape)
         pred_audio = self.generator(mel)
-        # print("Pred audio shape:", pred_audio.shape)
+
         if pred_audio[0].shape[-1] > batch["audio"].shape[-1]:
             pred_audio = pred_audio[..., :batch["audio"].shape[-1]]
         elif pred_audio[0].shape[-1] < batch["audio"].shape[-1]:
-            raise ValueError("Predicted audio is shorter than the ground truth")
+            raise ValueError("Predicted audio is shorter than original audio")
         batch["pred_audio"] = pred_audio
         return batch
 
     def discriminate(self, audio):
-        # Прогоняем аудио через мультискейл дискриминатор
         return self.msd(audio)
 
     def __str__(self):

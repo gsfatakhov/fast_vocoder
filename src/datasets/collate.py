@@ -9,6 +9,13 @@ def collate_fn(dataset_items: list[dict]):
 
     audio_batch = torch.stack(audios, dim=0)  # [B, 1, T]
 
+    if "mel" not in dataset_items[0]:
+        return {
+            "audio": audio_batch,
+            "text": texts,
+            "audio_name": audio_names
+        }
+
     mels = [item["mel"] for item in dataset_items]
     mels_batch = torch.stack(mels, dim=0).squeeze(1)  # [B, n_m
 

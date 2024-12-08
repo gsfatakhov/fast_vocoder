@@ -1,4 +1,4 @@
-_target_: src.model.HiFiGAN
+_target_: src.model.HiFiGAN_Plus_Mel
 generator_params:
   in_channels: 80
   upsample_rates: [8,8,2,2]
