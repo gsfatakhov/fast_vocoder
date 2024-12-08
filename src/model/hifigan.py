@@ -177,7 +177,13 @@ class HiFiGAN(nn.Module):
         batch с "pred_audio": [B, 1, T']
         """
         # print("Mel shape:", mel.shape)
+        # print("Audio shape:", batch["audio"].shape)
         pred_audio = self.generator(mel)
+        # print("Pred audio shape:", pred_audio.shape)
+        if pred_audio[0].shape[-1] > batch["audio"].shape[-1]:
+            pred_audio = pred_audio[..., :batch["audio"].shape[-1]]
+        elif pred_audio[0].shape[-1] < batch["audio"].shape[-1]:
+            raise ValueError("Predicted audio is shorter than the ground truth")
         batch["pred_audio"] = pred_audio
         return batch
 

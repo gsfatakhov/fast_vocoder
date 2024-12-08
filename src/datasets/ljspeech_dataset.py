@@ -10,30 +10,6 @@ import torch.nn.functional as F
 
 
 class LJSpeechDataset(BaseDataset):
-    """
-    LJSpeech dataset loader, following a structure similar to AvssDataset.
-    The dataset is expected to be organized as follows:
-
-    <audio_path>/
-        LJSpeech-1.1/
-            metadata.csv
-            wavs/
-                LJ001-0002.wav
-                LJ001-0003.wav
-                ...
-
-    The metadata.csv file contains lines in the format:
-    LJ001-0002|in being comparatively modern.|in being comparatively modern.
-    where:
-        - The first field is the file ID (e.g., LJ001-0002).
-        - The second field is normalized text.
-        - The third field is the original text.
-
-    This dataset class will read `metadata.csv`, create an index mapping each
-    file ID to its corresponding audio and text, load and preprocess audio,
-    and return it along with the corresponding text.
-    """
-
     def __init__(
             self,
             name="train",
@@ -41,20 +17,9 @@ class LJSpeechDataset(BaseDataset):
             audio_path=ROOT_PATH / "data" / "ljspeech",
             index_audio_path=None,
             use_normalized_text=True,
-            segment_length=8192,
+            segment_length=8191,
             *args, **kwargs
     ):
-        """
-        Args:
-            name (str): partition name. Since LJSpeech doesn't have predefined splits,
-                         you may define your own splits externally and provide a custom
-                         metadata or subset. For now, will assume the entire dataset as 'train'.
-            target_sr (int): target sample rate for loading audio files.
-            audio_path (Path): path to the directory containing LJSpeech-1.1 folder.
-            index_audio_path (Path): path where to store or read the index.json file.
-            use_normalized_text (bool): if True, use normalized text (2nd field from metadata),
-                                        else use the original text (3rd field).
-        """
         self.name = name
         self.target_sr = target_sr
         self.audio_path = Path(audio_path)
@@ -70,7 +35,6 @@ class LJSpeechDataset(BaseDataset):
 
         self.index_audio_path /= "index.json"
 
-        # Check if index already exists, otherwise create it
         if self.index_audio_path.exists():
             index = read_json(str(self.index_audio_path))
         else:
@@ -79,19 +43,6 @@ class LJSpeechDataset(BaseDataset):
         super().__init__(index, *args, **kwargs)
 
     def __getitem__(self, ind):
-        """
-        Get element from the index, load and preprocess it.
-
-        Args:
-            ind (int): index in the self.index list.
-        Returns:
-            instance_data (dict):
-                {
-                    "audio": torch.Tensor,
-                    "text": str,
-                    "audio_name": str
-                }
-        """
         data_dict = self._index[ind]
 
         audio_path = data_dict["audio_path"]
@@ -100,24 +51,22 @@ class LJSpeechDataset(BaseDataset):
 
         audio_tensor = self.load_audio(audio_path)
 
-        # Если train, берём случайный отрезок segment_length
         if self.name == "train":
             if audio_tensor.shape[-1] >= self.segment_length:
                 max_start = audio_tensor.shape[-1] - self.segment_length
-                start = torch.randint(0, max_start+1, (1,)).item()
-                audio_tensor = audio_tensor[:, start:start+self.segment_length]
+                start = torch.randint(0, max_start + 1, (1,)).item()
+                audio_tensor = audio_tensor[:, start:start + self.segment_length]
             else:
-                # Если аудио короче segment_length, можно или пропустить, или дополнить нулями.
                 diff = self.segment_length - audio_tensor.shape[-1]
                 audio_tensor = F.pad(audio_tensor, (0, diff))
 
         else:
-            # Для валидации/теста можно использовать, например, начальный отрезок
-            # или взять весь файл (тогда при collation будет паддинг)
-            if audio_tensor.shape[-1] > self.segment_length:
-                audio_tensor = audio_tensor[:, :self.segment_length]
+            # 21 seconds is the longest audio in the dataset, sr=22050
+            test_length = 8192 * 57 - 1
+            if audio_tensor.shape[-1] > test_length:
+                audio_tensor = audio_tensor[:, :test_length]
             else:
-                diff = self.segment_length - audio_tensor.shape[-1]
+                diff = test_length - audio_tensor.shape[-1]
                 audio_tensor = F.pad(audio_tensor, (0, diff))
 
         instance_data = {
@@ -139,16 +88,6 @@ class LJSpeechDataset(BaseDataset):
         return audio_tensor
 
     def _create_index(self):
-        """
-        Parse metadata.csv to create the dataset index.
-        Returns:
-            index (list[dict]): each entry contains:
-                {
-                    "audio_path": str,
-                    "text": str,
-                    "audio_name": str
-                }
-        """
         index = []
         metadata_path = self.audio_path / "metadata.csv"
         wavs_path = self.audio_path / "wavs"

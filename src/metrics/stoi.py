@@ -5,7 +5,7 @@ from torchmetrics.audio.stoi import ShortTimeObjectiveIntelligibility
 
 
 class STOI(BaseMetric):
-    def __init__(self, device="auto", fs=16000, extended=False, *args, **kwargs):
+    def __init__(self, device="auto", fs=22050, extended=False, *args, **kwargs):
         """
         STOI (Short-Time Objective Intelligibility) metric.
 
@@ -46,4 +46,25 @@ class STOI(BaseMetric):
         #     min_len = min(audio.shape[-1], pred_audio.shape[-1])
         #     audio = audio[..., :min_len]
         #     pred_audio = pred_audio[..., :min_len]
+
+        # Ensure at least 30 frames for intermediate intelligibility
+        # if audio.shape[-1] < 30:
+        #     print(audio.shape[-1])
+        #     raise ValueError(
+        #         "Not enough STFT frames to compute intermediate intelligibility measure after removing silent frames. "
+        #         "Please check your audio files."
+        #     )
+
+        # shapes
+
+        # print("audio shape:", audio.shape)
+        # print("pred_audio shape:", pred_audio.shape)
+
+        #ensure audio and pred_audio between -1 and 1
+        # audio = torch.clamp(audio, -1, 1)
+        # pred_audio = torch.clamp(pred_audio, -1, 1)
+
+        # print(audio[0])
+        # print(pred_audio[0])
+
         return self.metric(pred_audio, audio)
