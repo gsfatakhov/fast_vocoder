@@ -69,7 +69,8 @@ def get_dataloaders(config, device):
     dataloaders = {}
     for dataset_partition in config.datasets.keys():
         dataset = datasets[dataset_partition]
-        dataloader_conf = config.dataloader[dataset_partition]
+        # dataloader_conf = config.dataloader[dataset_partition]
+        dataloader_conf = config.dataloader
 
         assert dataloader_conf.batch_size <= len(dataset), (
             f"The batch size ({dataloader_conf.batch_size}) cannot "

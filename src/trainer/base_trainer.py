@@ -121,6 +121,13 @@ class BaseTrainer:
 
         # define metrics
         self.metrics = metrics
+        # if self.metrics["train"] is None:
+        #     self.train_metrics = MetricTracker(
+        #         *self.config.writer.loss_names,
+        #         "grad_norm",
+        #         writer=self.writer,
+        #     )
+        # else:
         self.train_metrics = MetricTracker(
             *self.config.writer.loss_names,
             "grad_norm",

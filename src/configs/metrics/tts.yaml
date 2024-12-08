@@ -1,11 +1,9 @@
 device: "auto"
-train: # metrics that are calculated during training
-#  - _target_: src.metrics.PESQ
-#    device: ${metrics.device}
-#    name: "PESQ"
+train:
   - _target_: src.metrics.STOI
     device: ${metrics.device}
     name: "STOI"
+    group_size: 3
 inference: # metrics that are calculated during inference (eval)
   - _target_: src.metrics.PESQ
     device: ${metrics.device}

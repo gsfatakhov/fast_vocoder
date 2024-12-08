@@ -5,7 +5,7 @@ from torchmetrics.audio.stoi import ShortTimeObjectiveIntelligibility
 
 
 class STOI(BaseMetric):
-    def __init__(self, device="auto", fs=22050, extended=False, *args, **kwargs):
+    def __init__(self, device="auto", fs=22050, extended=False, group_size=3, *args, **kwargs):
         """
         STOI (Short-Time Objective Intelligibility) metric.
 
@@ -17,54 +17,33 @@ class STOI(BaseMetric):
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else "cpu"
         self.metric = ShortTimeObjectiveIntelligibility(fs, extended=extended).to(device)
+        self.group_size = group_size
 
-    def __call__(
-            self,
-            audio: torch.Tensor,  # Ground truth audio [B, 1, T]
-            pred_audio: torch.Tensor,  # Predicted audio [B, 1, T]
-            **kwargs
-    ):
+    def __call__(self, audio: torch.Tensor, pred_audio: torch.Tensor, **kwargs):
         """
-        Compute STOI between predicted and reference audio.
+        Compute STOI between predicted and reference audio using concatenation.
 
         Args:
-            audio_ref (Tensor): reference audio [B, 1, T]
-            pred_audio (Tensor): predicted audio [B, 1, T]
+            audio (Tensor): Reference audio [B, 1, T].
+            pred_audio (Tensor): Predicted audio [B, 1, T].
 
         Returns:
             (float): STOI score averaged over the batch.
         """
-        # nuber of positive values in audios
-        # pos = sum([torch.sum(audio > 0).item() for audio in audio])
-        # neg = sum([torch.sum(audio < 0).item() for audio in audio])
+        batch_size, _, total_length = audio.shape
+        stoi_scores = []
 
-        # print("Last Positive values in audios:", pos)
-        # print("Last Negative values in audios:", neg)
+        for i in range(0, batch_size, self.group_size):
+            audio_group = audio[i:i + self.group_size]
+            pred_audio_group = pred_audio[i:i + self.group_size]
 
-        # make audio_ref and pred_audio same T
-        # if audio.shape[-1] != pred_audio.shape[-1]:
-        #     min_len = min(audio.shape[-1], pred_audio.shape[-1])
-        #     audio = audio[..., :min_len]
-        #     pred_audio = pred_audio[..., :min_len]
+            audio_combined = torch.cat([x.squeeze(0) for x in audio_group], dim=-1)
+            pred_audio_combined = torch.cat([x.squeeze(0) for x in pred_audio_group], dim=-1)
 
-        # Ensure at least 30 frames for intermediate intelligibility
-        # if audio.shape[-1] < 30:
-        #     print(audio.shape[-1])
-        #     raise ValueError(
-        #         "Not enough STFT frames to compute intermediate intelligibility measure after removing silent frames. "
-        #         "Please check your audio files."
-        #     )
+            audio_combined = audio_combined / torch.max(torch.abs(audio_combined))
+            pred_audio_combined = pred_audio_combined / torch.max(torch.abs(pred_audio_combined))
 
-        # shapes
+            stoi_value = self.metric(pred_audio_combined.unsqueeze(0), audio_combined.unsqueeze(0))
+            stoi_scores.append(stoi_value.item())
 
-        # print("audio shape:", audio.shape)
-        # print("pred_audio shape:", pred_audio.shape)
-
-        #ensure audio and pred_audio between -1 and 1
-        # audio = torch.clamp(audio, -1, 1)
-        # pred_audio = torch.clamp(pred_audio, -1, 1)
-
-        # print(audio[0])
-        # print(pred_audio[0])
-
-        return self.metric(pred_audio, audio)
+        return sum(stoi_scores) / len(stoi_scores)

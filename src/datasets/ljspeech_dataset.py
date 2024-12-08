@@ -8,6 +8,8 @@ from src.utils.io_utils import ROOT_PATH, read_json, write_json
 import torch
 import torch.nn.functional as F
 
+from src.utils.mel import MelSpectrogram, MelSpectrogramConfig
+
 
 class LJSpeechDataset(BaseDataset):
     def __init__(
@@ -25,6 +27,9 @@ class LJSpeechDataset(BaseDataset):
         self.audio_path = Path(audio_path)
         self.use_normalized_text = use_normalized_text
         self.segment_length = segment_length
+
+        self.mel_config = MelSpectrogramConfig()
+        self.mel_extractor = MelSpectrogram(self.mel_config)
 
         if not index_audio_path:
             index_audio_path = self.audio_path
@@ -61,18 +66,21 @@ class LJSpeechDataset(BaseDataset):
                 audio_tensor = F.pad(audio_tensor, (0, diff))
 
         else:
-            # 21 seconds is the longest audio in the dataset, sr=22050
-            test_length = 8192 * 57 - 1
+            # 21 seconds is the longest audio in the test dataset, sr=22050 n = 57
+            test_length = self.segment_length
             if audio_tensor.shape[-1] > test_length:
                 audio_tensor = audio_tensor[:, :test_length]
             else:
                 diff = test_length - audio_tensor.shape[-1]
                 audio_tensor = F.pad(audio_tensor, (0, diff))
 
+        mel = self.mel_extractor(audio_tensor)  # [B, n_mels, T']
+
         instance_data = {
             "audio": audio_tensor,
             "text": text,
-            "audio_name": audio_name
+            "audio_name": audio_name,
+            "mel": mel,
         }
 
         instance_data = self.preprocess_data(instance_data)
@@ -89,7 +97,7 @@ class LJSpeechDataset(BaseDataset):
 
     def _create_index(self):
         index = []
-        metadata_path = self.audio_path / "metadata.csv"
+        metadata_path = self.audio_path / (self.name + "_metadata.csv")
         wavs_path = self.audio_path / "wavs"
 
         assert metadata_path.exists(), f"metadata.csv not found at {metadata_path}"

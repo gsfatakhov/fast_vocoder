@@ -58,7 +58,7 @@ class Trainer(BaseTrainer):
         for loss_name in self.config.writer.loss_names:
             if loss_name in batch:
                 metrics.update(loss_name, batch[loss_name].item())
-
+        # if metric_funcs:
         for met in metric_funcs:
             metrics.update(met.name, met(**batch))
 

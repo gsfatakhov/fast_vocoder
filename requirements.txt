@@ -17,4 +17,3 @@ torchaudio
 librosa
 pesq
 pystoi
-fairseq

@@ -4,32 +4,22 @@ defaults:
   - metrics: tts
   - datasets: tts
   - transforms: example_only_batch
+  - dataloader: train
   - _self_
-dataloader:
-  train:
-    _target_: torch.utils.data.DataLoader
-    batch_size: 5
-    num_workers: 8
-    pin_memory: True
-  val:
-    _target_: torch.utils.data.DataLoader
-    batch_size: 1
-    num_workers: 8
-    pin_memory: True
 gen_optimizer:
   _target_: torch.optim.Adam
   betas: [0.8, 0.99]
   lr: 1e-4
 gen_lr_scheduler:
   _target_: torch.optim.lr_scheduler.ExponentialLR
-  gamma: 0.999
+  gamma: 0.9999
 disc_optimizer:
   _target_: torch.optim.Adam
   betas: [0.8, 0.99]
   lr: 5e-5
 disc_lr_scheduler:
   _target_: torch.optim.lr_scheduler.ExponentialLR
-  gamma: 0.999
+  gamma: 0.9999
 loss_function:
   _target_: src.loss.HiFiGANLoss
 trainer:
@@ -40,9 +30,9 @@ trainer:
   resume_from: null # null or path to the checkpoint dir with *.pth and config.yaml
   device: auto # device name or "auto"
   override: True # if True, will override the previous run with the same name
-  monitor: "max STOI" # "off" or "max/min metric_name", i.e. our goal is to maximize/minimize metric
+  monitor: "max val_STOI" # "off" or "max/min metric_name", i.e. our goal is to maximize/minimize metric
   save_period: 5 # checkpoint each save_period epochs in addition to the best epoch
   early_stop: ${trainer.n_epochs} # epochs for early stopping
   save_dir: "saved"
   seed: 7
-  max_grad_norm: 500.0
+  max_grad_norm: 1000.0
