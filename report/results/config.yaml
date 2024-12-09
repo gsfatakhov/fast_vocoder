@@ -1,0 +1,121 @@
+model:
+  _target_: src.model.HiFiGAN
+  generator_params:
+    in_channels: 80
+    upsample_rates:
+    - 8
+    - 8
+    - 2
+    - 2
+    upsample_initial_channel: 512
+    resblock_kernel_sizes:
+    - 3
+    - 7
+    - 11
+    resblock_dilation_sizes:
+    - - 1
+      - 3
+      - 5
+    - - 1
+      - 3
+      - 5
+    - - 1
+      - 3
+      - 5
+  discriminator_params:
+    num_scales: 3
+    scale_factor: 2
+writer:
+  _target_: src.logger.WandBWriter
+  project_name: TTS
+  entity: null
+  run_name: Production
+  mode: online
+  loss_names:
+  - loss_gen
+  - loss_disc
+  log_checkpoints: false
+  id_length: 8
+  run_id: u2ue388j
+metrics:
+  device: auto
+  train:
+  - _target_: src.metrics.STOI
+    device: ${metrics.device}
+    name: STOI
+    group_size: 4
+  inference:
+  - _target_: src.metrics.STOI
+    device: ${metrics.device}
+    name: STOI
+datasets:
+  train:
+    _target_: src.datasets.LJSpeechDataset
+    name: train
+    audio_path: /home/ubuntu/vocoder_project/LJSpeech-1.1
+    index_audio_path: /home/ubuntu/vocoder_project/LJSpeech-1.1
+  val:
+    _target_: src.datasets.LJSpeechDataset
+    name: val
+    audio_path: /home/ubuntu/vocoder_project/LJSpeech-1.1
+    index_audio_path: /home/ubuntu/vocoder_project/LJSpeech-1.1
+transforms:
+  batch_transforms:
+    train:
+      audio:
+        _target_: torch.nn.Sequential
+        _args_:
+        - _target_: src.transforms.Normalize1D
+          mean: 0
+          std: 1
+    inference:
+      audio:
+        _target_: torch.nn.Sequential
+        _args_:
+        - _target_: src.transforms.Normalize1D
+          mean: 0
+          std: 1
+  instance_transforms:
+    train: null
+    inference: null
+dataloader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 88
+  num_workers: 16
+  pin_memory: true
+gen_optimizer:
+  _target_: torch.optim.Adam
+  betas:
+  - 0.8
+  - 0.99
+  lr: 0.0001
+gen_lr_scheduler:
+  _target_: torch.optim.lr_scheduler.ExponentialLR
+  gamma: 0.9999
+disc_optimizer:
+  _target_: torch.optim.Adam
+  betas:
+  - 0.8
+  - 0.99
+  lr: 5.0e-05
+disc_lr_scheduler:
+  _target_: torch.optim.lr_scheduler.ExponentialLR
+  gamma: 0.9999
+loss_function:
+  _target_: src.loss.HiFiGANLoss
+trainer:
+  log_step: 25
+  n_epochs: 100
+  epoch_len: null
+  device_tensors:
+  - audio
+  - mel
+  resume_from: null
+  device: auto
+  override: true
+  monitor: max val_STOI
+  save_period: 5
+  early_stop: ${trainer.n_epochs}
+  save_dir: saved
+  seed: 7
+  max_grad_norm: 1000.0
