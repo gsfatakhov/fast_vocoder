@@ -5,11 +5,15 @@ from tqdm.auto import tqdm
 from src.metrics.tracker import MetricTracker
 from src.trainer.base_trainer import BaseTrainer
 
+class SynthesisInferencer(BaseTrainer):
+    """
+    Inferencer for pipline: text -> mel (Tacotron2) -> audio (HiFiGAN)
+    """
 
-class Inferencer(BaseTrainer):
     def __init__(
             self,
             model,
+            tacotron2,
             config,
             device,
             dataloaders,
@@ -19,19 +23,21 @@ class Inferencer(BaseTrainer):
             skip_model_load=False,
     ):
         assert (
-                skip_model_load or config.inferencer.get("from_pretrained") is not None
+            skip_model_load or config.synthesizer.get("from_pretrained") is not None
         ), "Provide checkpoint or set skip_model_load=True"
 
         self.config = config
-        self.cfg_trainer = self.config.inferencer
+        self.cfg_trainer = self.config.synthesizer
 
         self.device = device
 
-        self.model = model
+        self.model = model.to(device)
         self.batch_transforms = batch_transforms
 
-        self.evaluation_dataloaders = {k: v for k, v in dataloaders.items()}
+        self.tacotron2 = tacotron2.to(device)
+        self.tacotron2.eval()
 
+        self.evaluation_dataloaders = {k: v for k, v in dataloaders.items()}
         self.save_path = save_path
 
         self.metrics = metrics
@@ -44,7 +50,7 @@ class Inferencer(BaseTrainer):
             self.evaluation_metrics = None
 
         if not skip_model_load:
-            self._from_pretrained(config.inferencer.get("from_pretrained"))
+            self._from_pretrained(config.synthesizer.get("from_pretrained"))
 
     def run_inference(self):
         part_logs = {}
@@ -55,32 +61,50 @@ class Inferencer(BaseTrainer):
 
     def process_batch(self, batch_idx, batch, metrics, part):
         batch = self.move_batch_to_device(batch)
-        batch = self.transform_batch(batch)
+        # batch = self.transform_batch(batch)
 
-        outputs = self.model(**batch)
-        batch.update(outputs)
+        texts = batch["text"]
+        audio_names = batch["audio_name"]
+        sr = 22050
+
+        pred_audios = []
+
+        with torch.no_grad():
+            for i, text in enumerate(texts):
+                from tacotron2.text import text_to_sequence
+                sequence = torch.LongTensor(text_to_sequence(text, ['english_cleaners']))[None, :].to(self.device)
+                input_lengths = torch.IntTensor([sequence.shape[1]]).to(self.device)
+
+                # [1, n_mels, T_mel]
+                mel, _, _ = self.tacotron2.infer(sequence, input_lengths)
+
+                voc_batch = {"mel": mel}
+                voc_batch = self.model(**voc_batch)
+                pred_audio = voc_batch["pred_audio"].cpu()  # [1, 1, T]
+
+                pred_audios.append(pred_audio)
+
+        pred_audios = torch.cat(pred_audios, dim=0)  # [B, 1, T]
+        batch["pred_audio"] = pred_audios
 
         if metrics is not None:
             for met in self.metrics["inference"]:
                 metrics.update(met.name, met(**batch))
 
-        batch_size = batch["audio"].shape[0]
+        batch_size = pred_audios.shape[0]
 
-        sr = 22050
-
-        for i in range(batch_size):
-            pred_audio = batch["pred_audio"][i].clone().detach().cpu().squeeze(0)  # [T]
-
-            if self.save_path is not None:
-                out_path = self.save_path / part / f"{batch['audio_name'][i]}.wav"
+        if self.save_path is not None:
+            for i in range(batch_size):
+                out_path = self.save_path / part / f"{audio_names[i]}.wav"
                 out_path.parent.mkdir(parents=True, exist_ok=True)
-                torchaudio.save(str(out_path), pred_audio.unsqueeze(0), sr)
+                torchaudio.save(str(out_path), pred_audios[i], sr)
 
         return batch
 
     def _inference_part(self, part, dataloader):
         self.is_train = False
         self.model.eval()
+        self.tacotron2.eval()
 
         if self.evaluation_metrics is not None:
             self.evaluation_metrics.reset()

@@ -17,13 +17,12 @@ class Trainer(BaseTrainer):
         if self.is_train:
             metric_funcs = self.metrics["train"]
 
-            # 1. Обучение дискриминатора:
-            # Прогоняем модель в режиме detach для предсказаний (или внутри лосса учитываем detach)
+            # Для дискриминатора получаем генерации без градиентов
             with torch.no_grad():
-                outputs = self.model(**batch)  # pred_audio получаем
+                outputs = self.model(**batch)
 
             batch.update(outputs)
-            all_losses = self.criterion(**batch)  # здесь лосс считается с detach для фейковых предсказаний
+            all_losses = self.criterion(**batch)
             batch.update(all_losses)
 
             self.disc_optimizer.zero_grad()
@@ -33,8 +32,7 @@ class Trainer(BaseTrainer):
             if self.disc_lr_scheduler is not None:
                 self.disc_lr_scheduler.step()
 
-            # 2. Обучение генератора:
-            # Заново прогоняем модель, чтобы построить новый граф без detach
+            # обучение генератора
             outputs = self.model(**batch)
             batch.update(outputs)
             all_losses = self.criterion(**batch)
@@ -48,13 +46,12 @@ class Trainer(BaseTrainer):
                 self.gen_lr_scheduler.step()
 
         else:
-            # В режиме валидации:
+            # eval
             outputs = self.model(**batch)
             batch.update(outputs)
             all_losses = self.criterion(**batch)
             batch.update(all_losses)
 
-        # Логирование метрик и лоссов
         for loss_name in self.config.writer.loss_names:
             if loss_name in batch:
                 metrics.update(loss_name, batch[loss_name].item())
@@ -65,21 +62,6 @@ class Trainer(BaseTrainer):
         return batch
 
     def _log_batch(self, batch_idx, batch, mode="train"):
-        """
-        Log data from batch. Calls self.writer.add_* to log data
-        to the experiment tracker.
-
-        Args:
-            batch_idx (int): index of the current batch.
-            batch (dict): dict-based batch after going through
-                the 'process_batch' function.
-            mode (str): train or inference. Defines which logging
-                rules to apply.
-        """
-        # method to log data from you batch
-        # such as audio, text or images, for example
-
-        # logging scheme might be different for different partitions
         if mode == "train":  # the method is called only every self.log_step steps
             # Log Stuff
             pass
@@ -87,7 +69,7 @@ class Trainer(BaseTrainer):
             # Log Stuff
             self._log_audio(batch)
 
-            # TODO visualize mel spectrograms
+            # TODO may be visualize mel spectrograms
             # self.writer.add_image("mel_real", mel_real)
             # self.writer.add_image("mel_pred", mel_pred)
 

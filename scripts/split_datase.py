@@ -2,6 +2,7 @@ import random
 from pathlib import Path
 import argparse
 
+
 def split_ljspeech_dataset(dataset_path, train_ratio=0.95, seed=42):
     metadata_path = Path(dataset_path) / "metadata.csv"
     if not metadata_path.exists():
@@ -30,7 +31,6 @@ def split_ljspeech_dataset(dataset_path, train_ratio=0.95, seed=42):
 
 
 if __name__ == "__main__":
-    # Парсинг аргументов
     parser = argparse.ArgumentParser(description="Split LJSpeech to train and val.")
     parser.add_argument(
         "dataset_path",

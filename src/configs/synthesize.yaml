@@ -1,0 +1,18 @@
+defaults:
+  - model: hifigan_plus_mel
+  - transforms: empty
+  - _self_
+
+synthesizer:
+  device: auto
+  save_path: "synthesize_results"
+  from_pretrained: "/home/georgii/Documents/vocoder_3/model_best.pth"
+  text: null
+  device_tensors: []
+  tacotron_max_decoder_steps: 10000
+  seed: 7
+
+data:
+  root_dir: "datasets/tts_dataset"
+  batch_size: 1
+  num_workers: 0

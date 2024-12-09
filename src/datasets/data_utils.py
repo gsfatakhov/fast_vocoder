@@ -69,6 +69,7 @@ def get_dataloaders(config, device):
     dataloaders = {}
     for dataset_partition in config.datasets.keys():
         dataset = datasets[dataset_partition]
+        # Code for difference dataloaders for train and val
         # dataloader_conf = config.dataloader[dataset_partition]
         dataloader_conf = config.dataloader
 

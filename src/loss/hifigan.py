@@ -13,12 +13,6 @@ class HiFiGANLoss(nn.Module):
         self.model = None
 
     def forward(self, **batch):
-        """
-        Args:
-            batch: содержит:
-                "audio": [B, 1, T] - референс
-                "pred_audio": [B, 1, T'] - предсказанный звук
-        """
         real_audio = batch["audio"]  # [B, 1, T]
         pred_audio = batch["pred_audio"]  # [B, 1, T']
 

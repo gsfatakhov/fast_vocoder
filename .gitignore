@@ -116,4 +116,4 @@ __MACOSX/
 # dataset
 LJSpeech-1.1.tar.bz2
 LJSpeech-1.1/
-test_dataset/index/
+datasets/vocoder_dataset/index/

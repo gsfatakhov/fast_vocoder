@@ -8,6 +8,7 @@ pandas
 wandb
 comet_ml
 hydra-core
+tacotron2
 
 black
 isort

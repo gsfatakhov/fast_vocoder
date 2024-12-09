@@ -3,7 +3,7 @@ defaults:
   - writer: wandb
   - metrics: tts
   - datasets: tts_gpu_mel
-  - transforms: example_only_batch
+  - transforms: empty
   - dataloader: train
   - _self_
 gen_optimizer:
@@ -12,19 +12,19 @@ gen_optimizer:
   lr: 1e-4
 gen_lr_scheduler:
   _target_: torch.optim.lr_scheduler.ExponentialLR
-  gamma: 0.9999
+  gamma: 0.999
 disc_optimizer:
   _target_: torch.optim.Adam
   betas: [0.8, 0.99]
   lr: 5e-5
 disc_lr_scheduler:
   _target_: torch.optim.lr_scheduler.ExponentialLR
-  gamma: 0.9999
+  gamma: 0.999
 loss_function:
   _target_: src.loss.HiFiGANLoss
   device: cuda
 trainer:
-  log_step: 50
+  log_step: 25
   n_epochs: 100
   epoch_len: null
   device_tensors: ["audio"] # which tensors should be on device (ex. GPU)

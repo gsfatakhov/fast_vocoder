@@ -3,12 +3,6 @@ import torch
 
 from src.utils.mel import MelSpectrogramConfig, MelSpectrogram
 
-######################################################
-## HiFi-GAN Generator
-## См. статью: генератор использует несколько уровней апсэмплинга
-## и наборы резидуальных блоков (ResBlock1, ResBlock2).
-######################################################
-
 class ResBlock(nn.Module):
     def __init__(self, channels, kernel_size, dilations):
         super().__init__()
@@ -149,11 +143,11 @@ class HiFiGAN(nn.Module):
         if self.calc_mel and "mel" not in batch:
             batch["mel"] = self.mel_extractor(batch["audio"]).squeeze(1)
         pred_audio = self.generator(batch["mel"])
-
-        if pred_audio[0].shape[-1] > batch["audio"].shape[-1]:
-            pred_audio = pred_audio[..., :batch["audio"].shape[-1]]
-        elif pred_audio[0].shape[-1] < batch["audio"].shape[-1]:
-            raise ValueError("Predicted audio is shorter than original audio")
+        if "audio" in batch:
+            if pred_audio[0].shape[-1] > batch["audio"].shape[-1]:
+                pred_audio = pred_audio[..., :batch["audio"].shape[-1]]
+            elif pred_audio[0].shape[-1] < batch["audio"].shape[-1]:
+                raise ValueError("Predicted audio is shorter than original audio")
         batch["pred_audio"] = pred_audio
         return batch
 

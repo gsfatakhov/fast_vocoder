@@ -94,7 +94,8 @@ class LJSpeechDataset(BaseDataset):
 
     def load_audio(self, path):
         audio_tensor, sr = torchaudio.load(path)
-        audio_tensor = audio_tensor[0:1, :]  # keep only the first channel
+        # Берем только один канал
+        audio_tensor = audio_tensor[0:1, :]
         target_sr = self.target_sr
         if sr != target_sr:
             audio_tensor = torchaudio.functional.resample(audio_tensor, sr, target_sr)
@@ -116,8 +117,6 @@ class LJSpeechDataset(BaseDataset):
                     continue
 
                 parts = line.split("|")
-                # Example line format:
-                # LJ001-0002|in being comparatively modern.|in being comparatively modern.
                 if len(parts) < 3:
                     continue
                 file_id = parts[0].strip()
@@ -136,7 +135,6 @@ class LJSpeechDataset(BaseDataset):
                     "audio_name": file_id
                 })
 
-        # write index to disk
         write_json(index, self.index_audio_path)
         return index
 
