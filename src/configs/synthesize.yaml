@@ -13,6 +13,6 @@ synthesizer:
   seed: 7
 
 data:
-  root_dir: "datasets/tts_dataset"
+  root_dir: "datasets/tts_ljspeech_dataset"
   batch_size: 1
   num_workers: 0

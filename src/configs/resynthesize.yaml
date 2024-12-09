@@ -1,16 +1,20 @@
 defaults:
   - model: hifigan_plus_mel
   - metrics: test
-  - dataloader: train
   - transforms: example_only_batch
   - _self_
+dataloader:
+  _target_: torch.utils.data.DataLoader
+  batch_size: 1
+  num_workers: 8
+  pin_memory: True
 datasets:
   test:
     _target_: src.datasets.LJSpeechDataset
     name: "test"
     audio_path: "datasets/vocoder_dataset"
-    index_audio_path: "datasets/vocoder_dataset"
-    segment_length: 466944
+    index_audio_path: ${datasets.test.audio_path}
+    segment_length: null
 inferencer:
   device_tensors: ["audio", "mel"] # which tensors should be on device (ex. GPU)
   device: auto # device name or "auto"

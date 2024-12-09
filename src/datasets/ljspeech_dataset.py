@@ -71,6 +71,9 @@ class LJSpeechDataset(BaseDataset):
         else:
             # 21 seconds is the longest audio in the test dataset, sr=22050 n = 57
             test_length = self.segment_length
+            if test_length == None:
+                # pad to max length
+                test_length = audio_tensor.shape[-1]
             if audio_tensor.shape[-1] > test_length:
                 audio_tensor = audio_tensor[:, :test_length]
             else:
