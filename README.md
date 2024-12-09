@@ -94,6 +94,7 @@ NameOfTheDirectoryWithUtterances
 ```
 
 instead of dataset path, you can use text to synthesize.
+You get `single_utterance.wav` in the `results` folder.
 
 ## Other fearures
 
