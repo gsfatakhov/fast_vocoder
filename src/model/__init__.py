@@ -1,7 +1,7 @@
-from src.model.baseline_model import BaselineModel
 from src.model.hifigan import HiFiGAN
+from src.model.lightvoc import LightVoc
 
 __all__ = [
-    "BaselineModel",
     "HiFiGAN",
+    "LightVoc",
 ]

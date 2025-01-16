@@ -1,0 +1,39 @@
+_target_: src.model.LightVoc
+generator_params:
+  in_channels: 80
+  upsample_initial_channel: 512
+  num_heads: 8
+  ffn_dim: 256
+  num_layers: 2
+  conv_kernel_size: 31
+  dropout: 0.1
+
+discriminator_params:
+  combd_params:
+    combd_h_u: [[1, 32], [32, 64], [64, 128]]
+    combd_d_k: [5, 3, 3]
+    combd_d_s: [2, 2, 2]
+    combd_d_d: [1, 1, 1]
+    combd_d_g: [1, 1, 1]
+    combd_d_p: [2, 1, 1]
+    combd_op_f: 1
+    combd_op_k: 3
+    combd_op_g: 1
+
+  sbd_params:
+    pqmf_config:
+      sbd: [2, 32, 64]
+      fsbd: [1, 16, 32]
+    sbd_filters: [[16, 32], [32, 64], [64, 128]]
+    sbd_kernel_sizes: [5, 3, 3]
+    sbd_dilations: [1, 2, 4]
+    sbd_strides: [2, 2, 2]
+    sbd_band_ranges: [[0, 2], [2, 4], [4, 8]]
+    sbd_transpose: [False, True, False]
+    segment_size: 1024
+
+  mrsd_params:
+    fft_sizes: [1024, 2048, 512]
+    hop_sizes: [120, 240, 50]
+    win_lengths: [600, 1200, 240]
+    window: "hann_window"
