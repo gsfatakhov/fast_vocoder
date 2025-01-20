@@ -3,16 +3,18 @@ import torch
 
 from src.utils.mel import MelSpectrogramConfig, MelSpectrogram
 
-from src_lightvoc.generator import LightVocGenerator
-from src_lightvoc.discriminator import LightVocMultiDiscriminator
+from src.model.src_lightvoc.generator import LightVocGenerator
+from src.model.src_lightvoc.discriminator import LightVocMultiDiscriminator
 
 
 
 class LightVoc(nn.Module):
-    def __init__(self, generator_params, combd_params, sbd_params, mrsd_params, calc_mel=False):
+    def __init__(self, generator_params, discriminator_params, calc_mel=False):
         super().__init__()
         self.generator = LightVocGenerator(**generator_params)
-        self.discriminators = LightVocMultiDiscriminator(combd_params, sbd_params, mrsd_params)
+        self.discriminators = LightVocMultiDiscriminator(discriminator_params['combd_params'],
+                                                         discriminator_params['sbd_params'],
+                                                         discriminator_params['mrsd_params'])
 
         self.calc_mel = calc_mel
         if calc_mel:

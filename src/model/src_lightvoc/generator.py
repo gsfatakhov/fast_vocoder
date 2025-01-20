@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 
-from conformer import ConformerBlock
+from src.model.src_lightvoc.conformer import ConformerBlock
 
 class LightVocGenerator(nn.Module):
     def __init__(
