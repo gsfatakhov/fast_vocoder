@@ -113,8 +113,15 @@ class PQMF(torch.nn.Module):
         Returns:
             Tensor: Output tensor (B, subbands, T // subbands).
         """
+        print("Subbands: ", self.subbands)
+        print("Input shape: ", x.shape)
+
         x = F.conv1d(self.pad_fn(x), self.analysis_filter.to(x.device))
-        return F.conv1d(x, self.updown_filter.to(x.device), stride=self.subbands.to(x.device))
+        print("After conv1d: ", x.shape)
+        out = F.conv1d(x, self.updown_filter.to(x.device), stride=self.subbands)
+        print("After conv1d (2): ", out.shape)
+
+        return out
 
     def synthesis(self, x):
         """Synthesis with PQMF.

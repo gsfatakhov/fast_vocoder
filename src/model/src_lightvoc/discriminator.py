@@ -211,12 +211,14 @@ class CoMBD(torch.nn.Module):
         multi_scale_inputs = []
         multi_scale_inputs_hat = []
 
+        print("ys", ys.shape)
+
         for pqmf in self.pqmf:
             multi_scale_inputs.append(
-                pqmf.to(ys[-1]).analysis(ys[-1])[:, :1, :]
+                pqmf.to(ys).analysis(ys)[:, :1, :]
             )
             multi_scale_inputs_hat.append(
-                pqmf.to(ys[-1]).analysis(ys_hat[-1])[:, :1, :]
+                pqmf.to(ys).analysis(ys_hat)[:, :1, :]
             )
 
         outs_real = []
@@ -281,6 +283,7 @@ class MDC(torch.nn.Module):
     def forward(self, x):
         _out = None
         for _l in self.d_convs:
+            # TODO: print('x', x.shape)
             _x = torch.unsqueeze(_l(x), -1)
             _x = F.leaky_relu(_x, 0.2)
             if _out is None:
@@ -311,22 +314,19 @@ class SBDBlock(torch.nn.Module):
         for i in range(len(filters) - 1):
             filters_in_out.append([filters[i], filters[i + 1]])
 
-        for _s, _f, _k, _d in zip(
-            strides,
-            filters_in_out,
-            kernel_size,
-            dilations
-        ):
+        # Pass the entire kernel_size and dilations lists to each MDC
+        for _s, _f in zip(strides, filters_in_out):
             self.convs.append(MDC(
                 in_channels=_f[0],
                 out_channels=_f[1],
                 strides=_s,
-                kernel_size=_k,
-                dilations=_d,
+                kernel_size=kernel_size,  # Pass the entire list
+                dilations=dilations,      # Pass the entire list
                 use_spectral_norm=use_spectral_norm
             ))
+
         self.post_conv = norm_f(Conv1d(
-            in_channels=_f[1],
+            in_channels=filters_in_out[-1][1],
             out_channels=1,
             kernel_size=3,
             stride=1,
@@ -435,14 +435,15 @@ class LightVocMultiDiscriminator(nn.Module):
         self.sbd = SBD(**sbd_params)
         self.mrsd = MRSD(**mrsd_params)
 
-    def forward(self, audio):
+    def forward(self, real_audio, generated_audio):
         # audio: [B, 1, T]
-        out_combd, feats_combd = self.combd(audio)
-        out_sbd, feats_sbd = self.sbd(audio)
-        out_mrsd, feats_mrsd = self.mrsd(audio)
+        outs_real, outs_fake, f_maps_real, f_maps_fake = self.combd(real_audio, generated_audio)
+        y_d_rs_sbd, y_d_gs_sbd, fmap_rs_sbd, fmap_gs_sbd = self.sbd(real_audio, generated_audio)
+        y_d_rs_mrsd, y_d_gs_mrsd, fmap_rs_mrsd, fmap_gs_mrsd = self.mrsd(real_audio, generated_audio)
+
         return {
-            "CoMBD": {"output": out_combd, "features": feats_combd},
-            "SBD": {"output": out_sbd, "features": feats_sbd},
-            "MRSD": {"output": out_mrsd, "features": feats_mrsd},
+            "CoMBD": {"y_d_rs": outs_real, "y_d_gs": outs_fake, "fmap_rs": f_maps_real, "fmap_gs": f_maps_fake},
+            "SBD": {"y_d_rs": y_d_rs_sbd, "y_d_gs": y_d_gs_sbd, "fmap_rs": fmap_rs_sbd, "fmap_gs": fmap_gs_sbd},
+            "MRSD": {"y_d_rs": y_d_rs_mrsd, "y_d_gs": y_d_gs_mrsd, "fmap_rs": fmap_rs_mrsd, "fmap_gs": fmap_gs_mrsd},
         }
 

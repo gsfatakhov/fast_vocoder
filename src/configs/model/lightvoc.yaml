@@ -1,15 +1,33 @@
 _target_: src.model.LightVoc
-generator_params:
-  n_mels: 80
-  d_model: 256
-  d_ff: 1024
-  n_heads: 4
-  num_conformer_blocks: 6
-  conv_kernel_size: 31
-  n_fft: 1024
-  hop_length: 256
+
+stft_params:
+  filter_length: 1024
+  hop_length: 128
   win_length: 256
-  dropout: 0.1
+
+# Input mel spectrogram parameters
+#sr: int = 22050
+#win_length: int = 256
+#hop_length: int = 256
+#n_fft: int = 1024
+#f_min: int = 0
+#f_max: int = 8000
+#n_mels: int = 80
+#power: float = 1.0
+
+generator_params:
+  h:
+    upsample_initial_channel: 256
+    gen_istft_n_fft: 1024
+    conformer:
+      input_dim: 256
+      num_heads: 8
+      ffn_dim: 256
+      num_layers: 2
+      depthwise_conv_kernel_size: 31
+      dropout: 0.1
+
+
 
 discriminator_params:
   combd_params:
@@ -31,13 +49,13 @@ discriminator_params:
   sbd_params:
     h:
       pqmf_config:
-        sbd: [1, 64, 0.95]
-        fsbd: [1, 64, 0.95]
+        sbd: [64, 64, 0.95]
+        fsbd: [64, 64, 0.95]
       sbd_filters: [[64, 128], [128, 256], [256, 512]]
       sbd_kernel_sizes: [[5, 3, 3], [5, 3, 3], [5, 3, 3]]
       sbd_dilations: [[1, 2, 4], [1, 2, 4], [1, 2, 4]]
       sbd_strides: [[2, 2, 2], [2, 2, 2], [2, 2, 2]]
-      sbd_band_ranges: [[0, 32], [32, 64], [64, 128]]
+      sbd_band_ranges: [[0, 16], [16, 32], [32, 64]]
       sbd_transpose: [false, true, false]
       segment_size: 1024
     use_spectral_norm: false

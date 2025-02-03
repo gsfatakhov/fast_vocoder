@@ -1,67 +1,62 @@
 import torch
 import torch.nn as nn
 
-from src.model.src_lightvoc.conformer import ConformerBlock
+from src.model.src_lightvoc.conformer import Conformer
 
-class LightVocGenerator(nn.Module):
-    def __init__(
-            self,
-            n_mels=80,
-            d_model=256,
-            d_ff=1024,
-            n_heads=4,
-            num_conformer_blocks=6,
-            conv_kernel_size=31,
-            n_fft=1024,
-            hop_length=256,
-            win_length=256,
-            dropout=0.1
-    ):
-        super().__init__()
-        self.n_fft = n_fft
-        self.hop_length = hop_length
-        self.win_length = win_length
 
-        # Первый сверточный слой для приведения мел-спектрограммы в нужное пространство
-        self.input_conv = nn.Conv1d(n_mels, d_model, kernel_size=3, padding=1)
+from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 
-        # Стек Conformer-блоков
-        self.conformer_blocks = nn.ModuleList([
-            ConformerBlock(d_model, d_ff, n_heads, conv_kernel_size, dropout)
-            for _ in range(num_conformer_blocks)
-        ])
+from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 
-        # Финальный сверточный слой для получения коэффициентов STFT (реальная и мнимая части)
-        # Выходное число каналов = (n_fft // 2 + 1) * 2
-        self.output_conv = nn.Conv1d(d_model, (n_fft // 2 + 1) * 2, kernel_size=1)
+import torch.nn.functional as F
 
-    def forward(self, mel):
-        """
-        mel: [B, n_mels, T]
-        """
-        x = self.input_conv(mel)  # [B, d_model, T]
-        # Перестроение для обработки Conformer-блоками: [B, T, d_model]
-        x = x.transpose(1, 2)
 
-        for block in self.conformer_blocks:
-            x = block(x)
+def init_weights(m, mean=0.0, std=0.01):
+    classname = m.__class__.__name__
+    if classname.find("Conv") != -1:
+        m.weight.data.normal_(mean, std)
 
-        # Возвращаемся к форме [B, d_model, T] для свёрточного слоя
-        x = x.transpose(1, 2)
-        stft_out = self.output_conv(x)  # [B, (n_fft//2+1)*2, T]
+class LightVocGenerator(torch.nn.Module):
+    def __init__(self, h):
+        super(LightVocGenerator, self).__init__()
+        self.h = h
+        self.conv_pre = weight_norm(Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3))
+        self.conformer = Conformer(input_dim=h.upsample_initial_channel, num_heads=8, ffn_dim=256, num_layers=2, depthwise_conv_kernel_size=31, dropout=0.1)
+        self.post_n_fft = h.gen_istft_n_fft
+        self.conv_post = weight_norm(Conv1d(256, self.post_n_fft + 2, 7, 1, padding=3))
+        self.conv_post.apply(init_weights)
+        self.reflection_pad = torch.nn.ReflectionPad1d((1, 0))
 
-        B, channels, T = stft_out.shape
-        stft_out = stft_out.view(B, 2, self.n_fft // 2 + 1, T)
-        real = stft_out[:, 0, :, :]
-        imag = stft_out[:, 1, :, :]
-        complex_stft = torch.complex(real, imag)
 
-        # Обратное преобразование STFT (iSTFT) для получения waveform
-        waveform = torch.istft(
-            complex_stft,
-            n_fft=self.n_fft,
-            hop_length=self.hop_length,
-            win_length=self.win_length,
-            length=None
-        )
-        return waveform
+    def forward(self,  x):
+
+        time = x.shape[-1]
+        # constuct length tensor id batch size is x.shape[0]
+        length = torch.tensor([time] * x.shape[0], device=x.device)
+
+        # input 1 x 80 x time
+        #pre_conv
+        x = self.conv_pre(x) # 80 upsample to upsample_initial_channel
+        # after conv pre 1 x 512 x time
+        # x = einops.rearrange(x, 'b f t -> b t f')
+        x = x.permute(0, 2, 1)
+
+
+        x, _ = self.conformer(x, length)
+        # x = einops.rearrange(x, 'b t f -> b f t') #1 x 512 x time
+
+        x = x.permute(0, 2, 1)
+
+        x = F.leaky_relu(x)
+        x = self.reflection_pad(x)
+        x = self.conv_post(x)  # 1 x 18 x time
+        spec = torch.exp(x[:,:self.post_n_fft // 2 + 1, :])
+        phase = torch.sin(x[:, self.post_n_fft // 2 + 1:, :])
+
+        return spec, phase
+
+    def remove_weight_norm(self):
+        print('Removing weight norm...')
+        remove_weight_norm(self.conv_pre)
+        remove_weight_norm(self.conv_post)
+

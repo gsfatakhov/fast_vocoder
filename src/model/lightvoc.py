@@ -2,6 +2,7 @@ import torch.nn as nn
 import torch
 
 from src.utils.mel import MelSpectrogramConfig, MelSpectrogram
+from src.model.src_lightvoc.stft import TorchSTFT
 
 from src.model.src_lightvoc.generator import LightVocGenerator
 from src.model.src_lightvoc.discriminator import LightVocMultiDiscriminator
@@ -9,12 +10,20 @@ from src.model.src_lightvoc.discriminator import LightVocMultiDiscriminator
 
 
 class LightVoc(nn.Module):
-    def __init__(self, generator_params, discriminator_params, calc_mel=False):
+    def __init__(self, generator_params, discriminator_params, stft_params, calc_mel=False):
         super().__init__()
+
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
         self.generator = LightVocGenerator(**generator_params)
         self.discriminators = LightVocMultiDiscriminator(discriminator_params['combd_params'],
                                                          discriminator_params['sbd_params'],
                                                          discriminator_params['mrsd_params'])
+
+        self.stft = TorchSTFT(filter_length=stft_params.filter_length,
+                              hop_length=stft_params.hop_length,
+                              win_length=stft_params.win_length,
+                              device=self.device).to(self.device)
 
         self.calc_mel = calc_mel
         if calc_mel:
@@ -25,17 +34,16 @@ class LightVoc(nn.Module):
     def forward(self, **batch):
         if self.calc_mel and "mel" not in batch:
             batch["mel"] = self.mel_extractor(batch["audio"]).squeeze(1)
-        pred_audio = self.generator(batch["mel"])
-        if "audio" in batch:
-            if pred_audio.shape[-1] > batch["audio"].shape[-1]:
-                pred_audio = pred_audio[..., :batch["audio"].shape[-1]]
-            elif pred_audio.shape[-1] < batch["audio"].shape[-1]:
-                raise ValueError("Predicted audio is shorter than original audio")
+
+        spec, phase = self.generator(batch["mel"])
+
+        pred_audio = self.stft.inverse(spec, phase)
+
         batch["pred_audio"] = pred_audio
         return batch
 
-    def discriminate(self, audio):
-        return self.discriminators(audio)
+    def discriminate(self, real_audio, generated_audio):
+        return self.discriminators(real_audio, generated_audio)
 
     def __str__(self):
         all_parameters = sum(p.numel() for p in self.parameters())
