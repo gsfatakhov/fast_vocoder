@@ -57,9 +57,25 @@ class LightVocLoss(nn.Module):
 
             loss_mel = F.l1_loss(y_mel, y_g_hat_mel) * 45
 
-            y_du_hat_r, y_du_hat_g, fmap_u_r, fmap_u_g = discrimators_results["CoMBD"]
-            y_dp_hat_r, y_dp_hat_g, fmap_p_r, fmap_p_g = discrimators_results["SBD"]
-            y_ds_hat_r, y_ds_hat_g, fmap_s_r, fmap_s_g = discrimators_results["MRSD"]
+            y_du_hat_r = discrimators_results["CoMBD"]["y_d_rs"]
+            y_du_hat_g = discrimators_results["CoMBD"]["y_d_gs"]
+            fmap_u_r = discrimators_results["CoMBD"]["fmap_rs"]
+            fmap_u_g = discrimators_results["CoMBD"]["fmap_gs"]
+
+            # SBD
+            y_dp_hat_r = discrimators_results["SBD"]["y_d_rs"]
+            y_dp_hat_g = discrimators_results["SBD"]["y_d_gs"]
+            fmap_p_r = discrimators_results["SBD"]["fmap_rs"]
+            fmap_p_g = discrimators_results["SBD"]["fmap_gs"]
+
+            # MRSD
+
+            y_ds_hat_r = discrimators_results["MRSD"]["y_d_rs"]
+            y_ds_hat_g = discrimators_results["MRSD"]["y_d_gs"]
+            fmap_s_r = discrimators_results["MRSD"]["fmap_rs"]
+            fmap_s_g = discrimators_results["MRSD"]["fmap_gs"]
+
+            ###
 
             loss_fm_u = self._feature_loss(fmap_u_r, fmap_u_g)
             loss_fm_p = self._feature_loss(fmap_p_r, fmap_p_g)
@@ -70,8 +86,6 @@ class LightVocLoss(nn.Module):
             loss_gen_s, losses_gen_s = self._generator_loss(y_ds_hat_g)
 
             out["loss_gen"] = loss_gen_s + loss_gen_p + loss_gen_u + loss_fm_s + loss_fm_u + loss_fm_p + loss_mel
-
-
 
         if compute_discriminator_loss:
 

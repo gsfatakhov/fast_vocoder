@@ -211,8 +211,6 @@ class CoMBD(torch.nn.Module):
         multi_scale_inputs = []
         multi_scale_inputs_hat = []
 
-        print("ys", ys.shape)
-
         for pqmf in self.pqmf:
             multi_scale_inputs.append(
                 pqmf.to(ys).analysis(ys)[:, :1, :]
@@ -281,19 +279,34 @@ class MDC(torch.nn.Module):
         self.softmax = torch.nn.Softmax(dim=-1)
 
     def forward(self, x):
-        _out = None
-        for _l in self.d_convs:
-            # TODO: print('x', x.shape)
-            _x = torch.unsqueeze(_l(x), -1)
-            _x = F.leaky_relu(_x, 0.2)
-            if _out is None:
-                _out = _x
-            else:
-                _out = torch.cat([_out, _x], axis=-1)
-        x = torch.sum(_out, dim=-1)
-        x = self.post_conv(x)
-        x = F.leaky_relu(x, 0.2)  # @@
 
+        # old:
+
+        # _out = None
+        # for _l in self.d_convs:
+        #     # TODO: print('x', x.shape)
+        #     _x = torch.unsqueeze(_l(x), -1)
+        #     _x = F.leaky_relu(_x, 0.2)
+        #     if _out is None:
+        #         _out = _x
+        #     else:
+        #         _out = torch.cat([_out, _x], axis=-1)
+        # x = torch.sum(_out, dim=-1)
+        # x = self.post_conv(x)
+        # x = F.leaky_relu(x, 0.2)  # @@
+
+
+        outputs = []
+        for conv in self.d_convs:
+
+            out = conv(x)
+            out = F.leaky_relu(out, 0.2)
+            outputs.append(out)
+
+        x = torch.sum(torch.stack(outputs, dim=0), dim=0)
+
+        x = self.post_conv(x)
+        x = F.leaky_relu(x, 0.2)
         return x
 
 
@@ -338,7 +351,7 @@ class SBDBlock(torch.nn.Module):
         for _l in self.convs:
             x = _l(x)
             fmap.append(x)
-        x = self.post_conv(x)  # @@
+        x = self.post_conv(x)
 
         return x, fmap
 

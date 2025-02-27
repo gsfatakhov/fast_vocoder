@@ -7,6 +7,8 @@ from src.model.src_lightvoc.stft import TorchSTFT
 from src.model.src_lightvoc.generator import LightVocGenerator
 from src.model.src_lightvoc.discriminator import LightVocMultiDiscriminator
 
+import torch.nn.functional as F
+
 
 
 class LightVoc(nn.Module):
@@ -40,6 +42,15 @@ class LightVoc(nn.Module):
         pred_audio = self.stft.inverse(spec, phase)
 
         batch["pred_audio"] = pred_audio
+
+        if batch["audio"].shape[2] < batch["pred_audio"].shape[2]:
+            pad = batch["pred_audio"].shape[2] - batch["audio"].shape[2]
+            batch["audio"] = F.pad(batch["audio"], (0, pad), "constant", 0)
+        elif batch["audio"].shape[2] > batch["pred_audio"].shape[2]:
+            pad = batch["audio"].shape[2] - batch["pred_audio"].shape[2]
+            batch["pred_audio"] = F.pad(batch["pred_audio"], (0, pad), "constant", 0)
+
+
         return batch
 
     def discriminate(self, real_audio, generated_audio):
