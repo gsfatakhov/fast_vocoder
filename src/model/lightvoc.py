@@ -10,9 +10,8 @@ from src.model.src_lightvoc.discriminator import LightVocMultiDiscriminator
 import torch.nn.functional as F
 
 
-
 class LightVoc(nn.Module):
-    def __init__(self, generator_params, discriminator_params, stft_params, calc_mel=False):
+    def __init__(self, generator_params, discriminator_params, stft_params, mel_config=None):
         super().__init__()
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -27,30 +26,21 @@ class LightVoc(nn.Module):
                               win_length=stft_params.win_length,
                               device=self.device).to(self.device)
 
-        self.calc_mel = calc_mel
-        if calc_mel:
-            device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-            self.mel_config = MelSpectrogramConfig()
-            self.mel_extractor = MelSpectrogram(self.mel_config, device=device)
+        self.mel_config = mel_config
+        if self.mel_config:
+            self.mel_extractor = MelSpectrogram(self.mel_config, device=self.device)
 
     def forward(self, **batch):
-        if self.calc_mel and "mel" not in batch:
-            batch["mel"] = self.mel_extractor(batch["audio"]).squeeze(1)
+        if self.mel_config and "mel" not in batch:
+            batch["mel"] = self.mel_extractor(batch["audio"]).squeeze(1).detach()
 
         spec, phase = self.generator(batch["mel"])
 
-        pred_audio = self.stft.inverse(spec, phase)
+        length = None
+        if "audio" in batch:
+            length = batch["audio"].shape[2]
 
-        batch["pred_audio"] = pred_audio
-
-        if batch["audio"].shape[2] < batch["pred_audio"].shape[2]:
-            pad = batch["pred_audio"].shape[2] - batch["audio"].shape[2]
-            batch["audio"] = F.pad(batch["audio"], (0, pad), "constant", 0)
-        elif batch["audio"].shape[2] > batch["pred_audio"].shape[2]:
-            pad = batch["audio"].shape[2] - batch["pred_audio"].shape[2]
-            batch["pred_audio"] = F.pad(batch["pred_audio"], (0, pad), "constant", 0)
-
-
+        batch["pred_audio"] = self.stft.inverse(spec, phase, length=length)
         return batch
 
     def discriminate(self, real_audio, generated_audio):
@@ -67,5 +57,3 @@ class LightVoc(nn.Module):
         info += f"\nGenerator parameters: {gen_params}"
         info += f"\nDiscriminator parameters: {disc_params}"
         return info
-
-

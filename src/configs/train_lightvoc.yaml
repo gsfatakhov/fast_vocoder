@@ -5,6 +5,7 @@ defaults:
   - datasets: tts
   - transforms: example_only_batch
   - dataloader: train
+  - loss_function: lightvoc
   - _self_
 gen_optimizer:
   _target_: torch.optim.AdamW
@@ -20,21 +21,16 @@ disc_optimizer:
 disc_lr_scheduler:
   _target_: torch.optim.lr_scheduler.ExponentialLR
   gamma: 0.9999
-loss_function:
-  _target_: src.loss.LightVocLoss
-  fft_sizes: [ 1024, 2048, 512 ]
-  hop_sizes: [ 120, 240, 50 ]
-  win_lengths: [ 600, 1200, 240 ]
 
 trainer:
   log_step: 50
-  n_epochs: 100
+  n_epochs: 10000
   epoch_len: null
   device_tensors: ["audio", "mel"] # which tensors should be on device (ex. GPU)
   resume_from: null # null or path to the checkpoint dir with *.pth and config.yaml
   device: auto # device name or "auto"
-  override: True # if True, will override the previous run with the same name
-  monitor: "max val_STOI" # "off" or "max/min metric_name", i.e. our goal is to maximize/minimize metric
+  override: False # if True, will override the previous run with the same name
+  monitor: "max val_PESQ" # "off" or "max/min metric_name", i.e. our goal is to maximize/minimize metric
   save_period: 5 # checkpoint each save_period epochs in addition to the best epoch
   early_stop: ${trainer.n_epochs} # epochs for early stopping
   save_dir: "saved"
