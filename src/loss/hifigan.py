@@ -6,7 +6,7 @@ from src.utils.mel import MelSpectrogram, MelSpectrogramConfig
 
 
 class HiFiGANLoss(nn.Module):
-    def __init__(self, mel_config=MelSpectrogramConfig(), device="cuda"):
+    def __init__(self, mel_config=None, device="cuda"):
         super().__init__()
         self.mel_extractor = MelSpectrogram(mel_config, device=torch.device(device))
         self.l1 = nn.L1Loss()

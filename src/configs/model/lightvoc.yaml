@@ -1,0 +1,70 @@
+_target_: src.model.LightVoc
+
+stft_params:
+  filter_length: 1024
+  hop_length: 256
+  win_length: 1024
+
+#mel_config:
+#  _target_: src.utils.MelSpectrogramConfig
+#  sr: 22050
+#  win_length: 1024
+#  hop_length: 256
+#  n_fft: 1024
+#  f_min: 0
+#  f_max: 8000
+#  n_mels: 80
+#  power: 1.0
+#  pad_value: -11.5129251
+
+
+generator_params:
+  h:
+    upsample_initial_channel: 256
+    gen_istft_n_fft: 1024
+    conformer:
+      input_dim: 256
+      num_heads: 8
+      ffn_dim: 256
+      num_layers: 2
+      depthwise_conv_kernel_size: 31
+      dropout: 0.1
+
+
+
+discriminator_params:
+  combd_params:
+    h:
+      combd_h_u: [[32, 64], [64, 128], [128, 256]]
+      combd_d_k: [[5, 3, 3], [5, 3, 3], [5, 3, 3]]
+      combd_d_s: [[2, 2, 2], [2, 2, 2], [2, 2, 2]]
+      combd_d_d: [[1, 1, 1], [1, 1, 1], [1, 1, 1]]
+      combd_d_g: [[1, 1, 1], [1, 1, 1], [1, 1, 1]]
+      combd_d_p: [[2, 1, 1], [2, 1, 1], [2, 1, 1]]
+      combd_op_f: [1, 1, 1]
+      combd_op_k: [3, 3, 3]
+      combd_op_g: [1, 1, 1]
+      pqmf_config:
+        lv2: [2, 128, 0.95]
+        lv1: [1, 64, 0.95]
+    use_spectral_norm: false
+
+  sbd_params:
+    h:
+      pqmf_config:
+        sbd: [64, 64, 0.95]
+        fsbd: [64, 64, 0.95]
+      sbd_filters: [[64, 128], [128, 256], [256, 512]]
+      sbd_kernel_sizes: [[5, 3, 3], [5, 3, 3], [5, 3, 3]]
+      sbd_dilations: [[1, 2, 4], [1, 2, 4], [1, 2, 4]]
+      sbd_strides: [[2, 2, 2], [2, 2, 2], [2, 2, 2]]
+      sbd_band_ranges: [[0, 16], [16, 32], [32, 64]]
+      sbd_transpose: [false, false, false]
+      segment_size: 1024
+    use_spectral_norm: false
+
+  mrsd_params:
+    fft_sizes: [1024, 2048, 512]
+    hop_sizes: [120, 240, 50]
+    win_lengths: [600, 1200, 240]
+    window: "hann_window"

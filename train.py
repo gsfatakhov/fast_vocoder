@@ -51,7 +51,7 @@ def main(config):
     gen_optimizer = instantiate(config.gen_optimizer, params=gen_trainable_params)
     gen_lr_scheduler = instantiate(config.gen_lr_scheduler, optimizer=gen_optimizer)
 
-    disc_trainable_params = filter(lambda p: p.requires_grad, model.msd.parameters())
+    disc_trainable_params = filter(lambda p: p.requires_grad, model.discriminators.parameters())
     disc_optimizer = instantiate(config.disc_optimizer, params=disc_trainable_params)
     disc_lr_scheduler = instantiate(config.disc_lr_scheduler, optimizer=disc_optimizer)
 

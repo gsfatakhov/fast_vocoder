@@ -22,7 +22,7 @@ class Trainer(BaseTrainer):
                 outputs = self.model(**batch)
 
             batch.update(outputs)
-            all_losses = self.criterion(**batch)
+            all_losses = self.criterion(compute_generator_loss =False, **batch)
             batch.update(all_losses)
 
             self.disc_optimizer.zero_grad()
@@ -35,7 +35,7 @@ class Trainer(BaseTrainer):
             # обучение генератора
             outputs = self.model(**batch)
             batch.update(outputs)
-            all_losses = self.criterion(**batch)
+            all_losses = self.criterion(compute_discriminator_loss=False, **batch)
             batch.update(all_losses)
 
             self.gen_optimizer.zero_grad()

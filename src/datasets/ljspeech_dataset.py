@@ -19,8 +19,8 @@ class LJSpeechDataset(BaseDataset):
             audio_path=ROOT_PATH / "data" / "ljspeech",
             index_audio_path=None,
             use_normalized_text=True,
-            segment_length=8191,
-            calc_mel=True,
+            segment_length=8192,
+            mel_config=None,
             *args, **kwargs
     ):
         self.name = name
@@ -29,9 +29,8 @@ class LJSpeechDataset(BaseDataset):
         self.use_normalized_text = use_normalized_text
         self.segment_length = segment_length
 
-        self.calc_mel = calc_mel
-        if calc_mel:
-            self.mel_config = MelSpectrogramConfig()
+        self.mel_config = mel_config
+        if self.mel_config:
             self.mel_extractor = MelSpectrogram(self.mel_config)
 
         if not index_audio_path:
@@ -88,7 +87,7 @@ class LJSpeechDataset(BaseDataset):
             "audio_name": audio_name,
         }
 
-        if self.calc_mel:
+        if self.mel_config:
             instance_data["mel"] = self.mel_extractor(audio_tensor)  # [B, n_mels, T']
 
         instance_data = self.preprocess_data(instance_data)

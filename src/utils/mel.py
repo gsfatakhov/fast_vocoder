@@ -39,6 +39,7 @@ class MelSpectrogram(nn.Module):
             f_min=config.f_min,
             f_max=config.f_max,
             n_mels=config.n_mels
+            # center=False
         ).to(self.device)
 
         # The is no way to set power in constructor in 0.5.0 version.
@@ -69,3 +70,34 @@ class MelSpectrogram(nn.Module):
             .log_()
 
         return mel
+
+    def inverse(self, spec: torch.Tensor, phase: torch.Tensor, n_fft : int) -> torch.Tensor:
+        """
+        Reconstruct waveform from provided spectrogram magnitude and phase.
+        :param spec: Magnitude spectrogram of shape [B, n_fft//2+1, T]
+        :param phase: Phase tensor of shape [B, n_fft//2+1, T] (in radians)
+        :return: Reconstructed waveform of shape [B, T_reconstructed]
+        """
+        # Ensure the inputs are on the correct device.
+        spec = spec.to(self.device)
+        phase = phase.to(self.device)
+
+        # Combine magnitude and phase to create a complex spectrogram.
+        # Casting spec to complex if needed.
+        complex_spec = spec.to(torch.complex64) * torch.exp(1j * phase)
+
+        # Create a Hann window.
+        window = torch.hann_window(self.config.win_length).to(self.device)
+
+        # Perform the inverse STFT.
+        waveform = torch.istft(
+            complex_spec,
+            n_fft=n_fft,
+            hop_length=self.config.hop_length,
+            win_length=self.config.win_length,
+            window=window,
+            center=True,
+            normalized=False,
+            onesided=True
+        )
+        return waveform

@@ -3,12 +3,10 @@ train:
   name: "train"
   audio_path: "/home/georgii/Downloads/LJSpeech-1.1"
   index_audio_path: "/home/georgii/Downloads/LJSpeech-1.1"
-  calc_mel: False
   limit: 5
 val:
   _target_: src.datasets.LJSpeechDataset
   name: "val"
   audio_path: "/home/georgii/Downloads/LJSpeech-1.1"
   index_audio_path: "/home/georgii/Downloads/LJSpeech-1.1"
-  calc_mel: False
   limit: 5
