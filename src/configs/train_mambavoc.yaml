@@ -1,5 +1,5 @@
 defaults:
-  - model: lightvoc
+  - model: mambavoc
   - writer: wandb
   - metrics: tts
   - datasets: tts
@@ -29,7 +29,7 @@ trainer:
   device_tensors: ["audio", "mel"] # which tensors should be on device (ex. GPU)
   resume_from: null # null or path to the checkpoint dir with *.pth and config.yaml
   device: auto # device name or "auto"
-  override: False # if True, will override the previous run with the same name
+  override: True # if True, will override the previous run with the same name
   monitor: "max val_PESQ" # "off" or "max/min metric_name", i.e. our goal is to maximize/minimize metric
   save_period: 5 # checkpoint each save_period epochs in addition to the best epoch
   early_stop: ${trainer.n_epochs} # epochs for early stopping

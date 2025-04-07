@@ -1,13 +1,11 @@
 import torch.nn as nn
 import torch
 
-from src.utils.mel import MelSpectrogramConfig, MelSpectrogram
+from src.utils.mel import MelSpectrogram
 from src.model.src_lightvoc.stft import TorchSTFT
 
 from src.model.src_mambavoc.generator import MambaVocGenerator
 from src.model.src_lightvoc.discriminator import LightVocMultiDiscriminator
-
-import torch.nn.functional as F
 
 
 class MambaVoc(nn.Module):

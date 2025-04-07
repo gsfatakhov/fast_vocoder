@@ -22,7 +22,14 @@ class MambaVocGenerator(torch.nn.Module):
         self.conv_pre = weight_norm(Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3))
         self.conv_pre.apply(init_weights)
 
-        self.mamba = Mamba2()
+        # self.conformer = Conformer(input_dim=h.upsample_initial_channel, num_heads=8, ffn_dim=256, num_layers=2, depthwise_conv_kernel_size=31, dropout=0.1)
+
+        self.mamba = Mamba2(d_model=h.upsample_initial_channel, # Model dimension d_model
+                    d_state=64,  # SSM state expansion factor, typically 64 or 128
+                    d_conv=4,    # Local convolution width
+                    expand=2,    # Block expansion factor
+        ).to("cuda")
+
 
         self.post_n_fft = h.gen_istft_n_fft
         self.conv_post = weight_norm(Conv1d(256, self.post_n_fft + 2, 7, 1, padding=3))
@@ -33,7 +40,7 @@ class MambaVocGenerator(torch.nn.Module):
 
         time = x.shape[-1]
         # constuct length tensor id batch size is x.shape[0]
-        length = torch.tensor([time] * x.shape[0], device=x.device)
+        # length = torch.tensor([time] * x.shape[0], device=x.device)
 
         # input 1 x 80 x time
         # pre_conv
@@ -42,7 +49,7 @@ class MambaVocGenerator(torch.nn.Module):
         # x = einops.rearrange(x, 'b f t -> b t f')
         x = x.permute(0, 2, 1)
 
-        x, _ = self.conformer(x, length)
+        x = self.mamba(x)
 
         # x = einops.rearrange(x, 'b t f -> b f t') #1 x 512 x time
         x = x.permute(0, 2, 1)
