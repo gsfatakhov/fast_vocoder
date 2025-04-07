@@ -18,3 +18,4 @@ torchaudio
 librosa
 pesq
 pystoi
+mamba-ssm
