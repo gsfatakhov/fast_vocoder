@@ -1,5 +1,7 @@
 _target_: src.model.LightVoc
 
+device: "cuda"
+
 stft_params:
   filter_length: 1024
   hop_length: 256
