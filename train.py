@@ -8,6 +8,7 @@ from omegaconf import OmegaConf
 from src.datasets.data_utils import get_dataloaders
 from src.trainer import Trainer
 from src.utils.init_utils import set_random_seed, setup_saving_and_logging
+from src.utils.mel import MelSpectrogram, MelSpectrogramConfig
 
 warnings.filterwarnings("ignore", category=UserWarning)
 
@@ -42,8 +43,7 @@ def main(config):
     logger.info(model)
 
     # get function handles of loss and metrics
-    loss_function = instantiate(config.loss_function).to(device)
-    loss_function.model = model
+    loss_function = instantiate(config.loss_function, model=model).to(device)
     metrics = instantiate(config.metrics)
 
     # build optimizer, learning rate scheduler
@@ -51,9 +51,12 @@ def main(config):
     gen_optimizer = instantiate(config.gen_optimizer, params=gen_trainable_params)
     gen_lr_scheduler = instantiate(config.gen_lr_scheduler, optimizer=gen_optimizer)
 
-    disc_trainable_params = filter(lambda p: p.requires_grad, model.discriminators.parameters())
+    disc_trainable_params = filter(lambda p: p.requires_grad, model.discriminator.parameters())
     disc_optimizer = instantiate(config.disc_optimizer, params=disc_trainable_params)
     disc_lr_scheduler = instantiate(config.disc_lr_scheduler, optimizer=disc_optimizer)
+
+    #TODO: make it global params
+    mel_extractor = instantiate(config.mel_extractor)
 
     # epoch_len = number of iterations for iteration-based training
     # epoch_len = None or len(dataloader) for epoch-based training
@@ -75,6 +78,7 @@ def main(config):
         writer=writer,
         batch_transforms=batch_transforms,
         skip_oom=config.trainer.get("skip_oom", True),
+        mel_extractor=mel_extractor,
     )
 
     trainer.train()

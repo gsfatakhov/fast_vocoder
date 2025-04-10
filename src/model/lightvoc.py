@@ -1,25 +1,24 @@
-import torch.nn as nn
 import torch
 
-from src.utils.mel import MelSpectrogramConfig, MelSpectrogram
+from src.utils.mel import MelSpectrogram
 from src.model.src_lightvoc.stft import TorchSTFT
+
+from src.model.gan_base_model import GanBaseModel
 
 from src.model.src_lightvoc.generator import LightVocGenerator
 from src.model.src_lightvoc.discriminator import LightVocMultiDiscriminator
 
-import torch.nn.functional as F
 
-
-class LightVoc(nn.Module):
+class LightVoc(GanBaseModel):
     def __init__(self, device, generator_params, discriminator_params, stft_params, mel_config=None):
-        super().__init__()
+        device = torch.device(device)
 
-        self.device = torch.device(device)
-
-        self.generator = LightVocGenerator(**generator_params)
-        self.discriminators = LightVocMultiDiscriminator(discriminator_params['combd_params'],
+        generator = LightVocGenerator(**generator_params)
+        discriminator = LightVocMultiDiscriminator(discriminator_params['combd_params'],
                                                          discriminator_params['sbd_params'],
                                                          discriminator_params['mrsd_params'])
+
+        super().__init__(device, generator, discriminator)
 
         self.stft = TorchSTFT(filter_length=stft_params.filter_length,
                               hop_length=stft_params.hop_length,
@@ -43,14 +42,11 @@ class LightVoc(nn.Module):
         batch["pred_audio"] = self.stft.inverse(spec, phase, length=length)
         return batch
 
-    def discriminate(self, real_audio, generated_audio):
-        return self.discriminators(real_audio, generated_audio)
-
     def __str__(self):
         all_parameters = sum(p.numel() for p in self.parameters())
         trainable_parameters = sum(p.numel() for p in self.parameters() if p.requires_grad)
         gen_params = sum(p.numel() for p in self.generator.parameters())
-        disc_params = sum(p.numel() for p in self.discriminators.parameters())
+        disc_params = sum(p.numel() for p in self.discriminator.parameters())
         info = super().__str__()
         info += f"\nAll parameters: {all_parameters}"
         info += f"\nTrainable parameters: {trainable_parameters}"
