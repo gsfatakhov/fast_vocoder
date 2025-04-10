@@ -9,6 +9,10 @@ from src.datasets.data_utils import inf_loop
 from src.metrics.tracker import MetricTracker
 from src.utils.io_utils import ROOT_PATH
 
+from src.model.gan_base_model import GanBaseModel
+
+from src.utils.mel import MelSpectrogramConfig, MelSpectrogram
+
 
 class BaseTrainer:
     """
@@ -17,7 +21,7 @@ class BaseTrainer:
 
     def __init__(
         self,
-        model,
+        model: GanBaseModel,
         criterion,
         metrics,
         gen_optimizer,
@@ -29,13 +33,14 @@ class BaseTrainer:
         dataloaders,
         logger,
         writer,
+        mel_extractor,
         epoch_len=None,
         skip_oom=True,
         batch_transforms=None,
     ):
         """
         Args:
-            model (nn.Module): PyTorch model.
+            model (GanBaseModel): PyTorch model.
             criterion (nn.Module): loss function for model training.
             metrics (dict): dict with the definition of metrics for training
                 (metrics[train]) and inference (metrics[inference]). Each
@@ -75,6 +80,8 @@ class BaseTrainer:
         self.disc_optimizer = disc_optimizer
         self.disc_lr_scheduler = disc_lr_scheduler
         self.batch_transforms = batch_transforms
+
+        self.mel_extractor = mel_extractor
 
         # define dataloaders
         self.train_dataloader = dataloaders["train"]

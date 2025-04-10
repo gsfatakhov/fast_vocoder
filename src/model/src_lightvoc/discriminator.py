@@ -450,6 +450,7 @@ class LightVocMultiDiscriminator(nn.Module):
 
     def forward(self, real_audio, generated_audio):
         # audio: [B, 1, T]
+        # Дискриминатор отдает на выход классы на реальных аудио, классы на схенерированных аудио и их feature maps соотв.
         outs_real, outs_fake, f_maps_real, f_maps_fake = self.combd(real_audio, generated_audio)
         y_d_rs_sbd, y_d_gs_sbd, fmap_rs_sbd, fmap_gs_sbd = self.sbd(real_audio, generated_audio)
         y_d_rs_mrsd, y_d_gs_mrsd, fmap_rs_mrsd, fmap_gs_mrsd = self.mrsd(real_audio, generated_audio)
@@ -459,4 +460,3 @@ class LightVocMultiDiscriminator(nn.Module):
             "SBD": {"y_d_rs": y_d_rs_sbd, "y_d_gs": y_d_gs_sbd, "fmap_rs": fmap_rs_sbd, "fmap_gs": fmap_gs_sbd},
             "MRSD": {"y_d_rs": y_d_rs_mrsd, "y_d_gs": y_d_gs_mrsd, "fmap_rs": fmap_rs_mrsd, "fmap_gs": fmap_gs_mrsd},
         }
-

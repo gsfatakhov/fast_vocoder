@@ -18,14 +18,14 @@ class Trainer(BaseTrainer):
             metric_funcs = self.metrics["train"]
 
             # Для дискриминатора получаем генерации без градиентов
+            self.disc_optimizer.zero_grad()
             with torch.no_grad():
                 outputs = self.model(**batch)
-
             batch.update(outputs)
-            all_losses = self.criterion(compute_generator_loss =False, **batch)
-            batch.update(all_losses)
 
-            self.disc_optimizer.zero_grad()
+            disc_loss = self.criterion(compute_generator_loss=False, **batch)
+            batch.update(disc_loss)
+
             batch["loss_disc"].backward()
             self._clip_grad_norm()
             self.disc_optimizer.step()
@@ -33,18 +33,23 @@ class Trainer(BaseTrainer):
                 self.disc_lr_scheduler.step()
 
             # обучение генератора
+            for param in self.model.discriminator.parameters():
+                param.requires_grad = False
+            self.gen_optimizer.zero_grad()
+
             outputs = self.model(**batch)
             batch.update(outputs)
-            all_losses = self.criterion(compute_discriminator_loss=False, **batch)
-            batch.update(all_losses)
+            gen_loss = self.criterion(compute_discriminator_loss=False, **batch)
+            batch.update(gen_loss)
 
-            self.gen_optimizer.zero_grad()
             batch["loss_gen"].backward()
             self._clip_grad_norm()
             self.gen_optimizer.step()
             if self.gen_lr_scheduler is not None:
                 self.gen_lr_scheduler.step()
 
+            for param in self.model.discriminator.parameters():
+                param.requires_grad = True
         else:
             # eval
             outputs = self.model(**batch)
@@ -68,10 +73,14 @@ class Trainer(BaseTrainer):
         else:
             # Log Stuff
             self._log_audio(batch)
+            self._log_mel(batch)
 
-            # TODO may be visualize mel spectrograms
-            # self.writer.add_image("mel_real", mel_real)
-            # self.writer.add_image("mel_pred", mel_pred)
+    def _log_mel(self, batch):
+        print(batch["mel"][0].shape)
+        mel_pred = self.mel_extractor(batch["pred_audio"][0])
+
+        self.writer.add_image("mel_real_first", batch["mel"][0])
+        self.writer.add_image("mel_pred_first", mel_pred)
 
     def _log_audio(self, batch):
         self.writer.add_audio("audio_first", batch["audio"][0], 22050)
