@@ -20,8 +20,6 @@ class LightVocLoss(GanBaseLoss):
 
     def _discriminator_loss(self, disc_real_outputs, disc_generated_outputs):
         loss = 0
-        r_losses = []
-        g_losses = []
         for dr, dg in zip(disc_real_outputs, disc_generated_outputs):
             r_loss = torch.mean((1 - dr) ** 2)
             g_loss = torch.mean(dg ** 2)
@@ -31,7 +29,6 @@ class LightVocLoss(GanBaseLoss):
 
     def _gen_adv_loss(self, disc_outputs):
         loss = 0
-        gen_losses = []
         for dg in disc_outputs:
             l = torch.mean((1 - dg) ** 2)
             loss += l
@@ -44,16 +41,31 @@ class LightVocLoss(GanBaseLoss):
 
         discrimators_results = self._discriminate(real_audio, pred_audio)
 
+        # {
+        #  "CoMBD": {"y_d_rs": outs_real, "y_d_gs": outs_fake, "fmap_rs": f_maps_real, "fmap_gs": f_maps_fake},
+        #  "SBD": {"y_d_rs": y_d_rs_sbd, "y_d_gs": y_d_gs_sbd, "fmap_rs": fmap_rs_sbd, "fmap_gs": fmap_gs_sbd},
+        #  "MRSD": {"y_d_rs": y_d_rs_mrsd, "y_d_gs": y_d_gs_mrsd, "fmap_rs": fmap_rs_mrsd, "fmap_gs": fmap_gs_mrsd},
+        # }
+
         out = {}
         if compute_generator_loss:
+            # Adversarial loss
             adv_loss = 0.0
             for result in discrimators_results:
                 adv_loss += self._gen_adv_loss(discrimators_results[result]["y_d_gs"])
             adv_loss /= len(discrimators_results)
 
+            # Stft loss
             aux_loss = self.gen_stft_loss(real_audio, pred_audio)
 
-            out["loss_gen"] = aux_loss + self.lambda_adv * adv_loss
+            # Feature matching loss
+            fm_loss = 0.0
+            for result in discrimators_results:
+                fm_loss += self._feature_loss(discrimators_results[result]["fmap_rs"],
+                                              discrimators_results[result]["fmap_gs"])
+
+            # Resulting loss
+            out["loss_gen"] = aux_loss + fm_loss + self.lambda_adv * adv_loss
 
         if compute_discriminator_loss:
             out["loss_disc"] = 0.0
