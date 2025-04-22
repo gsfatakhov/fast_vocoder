@@ -20,9 +20,27 @@ def main(config):
     else:
         device = config.synthesizer.device
 
-    tacotron2 = torch.hub.load('NVIDIA/DeepLearningExamples:torchhub', 'nvidia_tacotron2', model_math='fp16')
+    tacotron2 = torch.hub.load(
+        'NVIDIA/DeepLearningExamples:torchhub',
+        'nvidia_tacotron2',
+        pretrained=False
+    )
+
+    checkpoint = torch.hub.load_state_dict_from_url(
+        'https://api.ngc.nvidia.com/v2/models/nvidia/'
+        'tacotron2pyt_fp32/versions/1/files/'
+        'nvidia_tacotron2pyt_fp32_20190306.pth',
+        map_location=torch.device(device)
+    )
+
+    state_dict = {
+        k.replace('module.', ''): v
+        for k, v in checkpoint['state_dict'].items()
+    }
+    tacotron2.load_state_dict(state_dict)
+
     tacotron2.decoder.max_decoder_steps = config.synthesizer.tacotron_max_decoder_steps
-    tacotron2.to(device).eval()
+    tacotron2.eval()
 
     model = instantiate(config.model).to(device)
     print(model)
@@ -61,6 +79,7 @@ def main(config):
         for key, value in logs[part].items():
             full_key = part + "_" + key
             print(f"    {full_key:15s}: {value}")
+    print("Results saved to:", save_path)
 
 if __name__ == "__main__":
     main()

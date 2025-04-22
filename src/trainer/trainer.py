@@ -76,7 +76,6 @@ class Trainer(BaseTrainer):
             self._log_mel(batch)
 
     def _log_mel(self, batch):
-        print(batch["mel"][0].shape)
         mel_pred = self.mel_extractor(batch["pred_audio"][0])
 
         self.writer.add_image("mel_real_first", batch["mel"][0])
