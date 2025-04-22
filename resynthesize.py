@@ -61,6 +61,7 @@ def main(config):
         for key, value in logs[part].items():
             full_key = part + "_" + key
             print(f"    {full_key:15s}: {value}")
+    print("Results saved to:", save_path)
 
 
 if __name__ == "__main__":
