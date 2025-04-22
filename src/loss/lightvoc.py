@@ -63,6 +63,7 @@ class LightVocLoss(GanBaseLoss):
             for result in discrimators_results:
                 fm_loss += self._feature_loss(discrimators_results[result]["fmap_rs"],
                                               discrimators_results[result]["fmap_gs"])
+            fm_loss /= len(discrimators_results)
 
             # Resulting loss
             out["loss_gen"] = aux_loss + fm_loss + self.lambda_adv * adv_loss
