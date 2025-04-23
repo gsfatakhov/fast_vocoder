@@ -13,18 +13,18 @@ gen_optimizer:
   lr: 2e-4
 gen_lr_scheduler:
   _target_: torch.optim.lr_scheduler.ExponentialLR
-  gamma: 0.9999
+  gamma: 0.99999
 disc_optimizer:
   _target_: torch.optim.AdamW
   betas: [0.9, 0.98]
   lr: 2e-4
 disc_lr_scheduler:
   _target_: torch.optim.lr_scheduler.ExponentialLR
-  gamma: 0.9999
+  gamma: 0.99999
 
 trainer:
   log_step: 50
-  n_epochs: 10000
+  n_epochs: 1000
   epoch_len: null
   device_tensors: ["audio", "mel"] # which tensors should be on device (ex. GPU)
   resume_from: null # null or path to the checkpoint dir with *.pth and config.yaml

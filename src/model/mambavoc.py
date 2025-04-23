@@ -9,12 +9,15 @@ from src.model.src_lightvoc.discriminator import LightVocMultiDiscriminator
 
 
 class MambaVoc(nn.Module):
-    def __init__(self, generator_params, discriminator_params, stft_params, mel_config=None):
+    def __init__(self, device, generator_params, discriminator_params, stft_params, mel_config=None):
         super().__init__()
 
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        if device == "auto":
+            self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        else:
+            self.device = torch.device(device)
 
-        self.generator = MambaVocGenerator(**generator_params)
+        self.generator = MambaVocGenerator(device=self.device, **generator_params)
         self.discriminators = LightVocMultiDiscriminator(discriminator_params['combd_params'],
                                                          discriminator_params['sbd_params'],
                                                          discriminator_params['mrsd_params'])
