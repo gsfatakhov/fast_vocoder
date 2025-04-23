@@ -1,6 +1,9 @@
 _target_: src.loss.LightVocLoss
 
-lambda_adv: 4.0
+# HIFIGAN like params
+lambda_adv: 1.0
+lambda_rec: 45.0
+lambda_feature: 2.0
 
 gen_stft_loss:
   _target_: src.loss.multi_res_stft_loss.MultiResolutionMelSpectrogramLoss
