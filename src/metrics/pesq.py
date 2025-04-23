@@ -35,6 +35,11 @@ class PESQ(BaseMetric):
         if self.need_resample:
             audio = self.resampler(audio)
             pred_audio = self.resampler(pred_audio)
+
+        # Normalize audio
+        audio = audio / torch.max(torch.abs(audio))
+        pred_audio = pred_audio / torch.max(torch.abs(pred_audio))
+
         val = 0.0
         try:
             val = self.metric(pred_audio, audio)
