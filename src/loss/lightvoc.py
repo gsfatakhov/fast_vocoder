@@ -16,7 +16,7 @@ class LightVocLoss(GanBaseLoss):
             for rl, gl in zip(dr, dg):
                 loss += torch.mean(torch.abs(rl - gl))
 
-        return loss * 2
+        return loss
 
     def _discriminator_loss(self, disc_real_outputs, disc_generated_outputs):
         loss = 0

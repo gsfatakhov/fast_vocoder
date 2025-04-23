@@ -12,16 +12,19 @@ class PESQ(BaseMetric):
         if device == "auto":
             device = "cuda" if torch.cuda.is_available() else "cpu"
 
-        self.orig_fs = fs
+        metric_fs = fs
         self.need_resample = False
-        if self.orig_fs > 16000:
-            self.resampler = Resample(self.orig_fs, 16000)
-            self.need_resample = True
-        elif self.orig_fs != 8000:
-            self.resampler = Resample(self.orig_fs, 8000)
+
+        if fs not in [8000, 16000]:
+            if fs > 16000:
+                metric_fs = 16000
+            else:
+                metric_fs = 8000
+
+            self.resampler = Resample(fs, metric_fs).to(device)
             self.need_resample = True
 
-        self.metric = PerceptualEvaluationSpeechQuality(fs, mode=mode, n_processes=n_processes).to(device)
+        self.metric = PerceptualEvaluationSpeechQuality(metric_fs, mode=mode, n_processes=n_processes).to(device)
 
     def __call__(
             self,
@@ -30,7 +33,8 @@ class PESQ(BaseMetric):
             **kwargs
     ):
         if self.need_resample:
-            audio = self.resampler
+            audio = self.resampler(audio)
+            pred_audio = self.resampler(pred_audio)
         val = 0.0
         try:
             val = self.metric(pred_audio, audio)
