@@ -2,10 +2,11 @@ import torch
 
 from src.loss.gan_base_loss import GanBaseLoss
 import torch.nn.functional as F
+from src.utils.mel import MelSpectrogram
 
 
 class LightVocLoss(GanBaseLoss):
-    def __init__(self, gen_stft_loss, model, lambda_adv, lambda_rec, lambda_feature):
+    def __init__(self, gen_stft_loss, model, lambda_adv, lambda_rec, lambda_feature, mel_config=None):
         super().__init__(model)
 
         self.lambda_adv = lambda_adv
@@ -13,6 +14,10 @@ class LightVocLoss(GanBaseLoss):
         self.lambda_feature = lambda_feature
 
         self.gen_stft_loss = gen_stft_loss
+
+        self.mel_extractor = None
+        if mel_config:
+            self.mel_extractor = MelSpectrogram(mel_config, device=model.device)
 
     def _feature_loss(self, fmap_r, fmap_g):
         loss = 0
@@ -61,7 +66,9 @@ class LightVocLoss(GanBaseLoss):
 
             # Stft loss
             # aux_loss = self.gen_stft_loss(real_audio, pred_audio)
-            aux_loss = F.l1_loss(real_audio, pred_audio)
+
+            pred_audio_mel = self.mel_extractor(pred_audio)
+            aux_loss = F.l1_loss(batch["mel"], pred_audio_mel)
 
             # Feature matching loss
             fm_loss = 0.0
@@ -71,6 +78,10 @@ class LightVocLoss(GanBaseLoss):
             fm_loss /= len(discrimators_results)
 
             # Resulting loss
+            out["loss_gen_rec"] = aux_loss
+            out["loss_gen_fm"] = fm_loss
+            out["loss_gen_adv"] = adv_loss
+
             out["loss_gen"] = self.lambda_rec * aux_loss + self.lambda_feature * fm_loss + self.lambda_adv * adv_loss
 
         if compute_discriminator_loss:
