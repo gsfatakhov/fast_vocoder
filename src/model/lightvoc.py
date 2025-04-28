@@ -41,15 +41,3 @@ class LightVoc(GanBaseModel):
 
         batch["pred_audio"] = self.stft.inverse(spec, phase, length=length)
         return batch
-
-    def __str__(self):
-        all_parameters = sum(p.numel() for p in self.parameters())
-        trainable_parameters = sum(p.numel() for p in self.parameters() if p.requires_grad)
-        gen_params = sum(p.numel() for p in self.generator.parameters())
-        disc_params = sum(p.numel() for p in self.discriminator.parameters())
-        info = super().__str__()
-        info += f"\nAll parameters: {all_parameters}"
-        info += f"\nTrainable parameters: {trainable_parameters}"
-        info += f"\nGenerator parameters: {gen_params}"
-        info += f"\nDiscriminator parameters: {disc_params}"
-        return info
