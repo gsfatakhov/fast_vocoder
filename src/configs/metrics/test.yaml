@@ -6,3 +6,4 @@ inference: # metrics that are calculated during inference (eval)
   - _target_: src.metrics.STOI
     device: ${metrics.device}
     name: "STOI"
+    group_size: 1
