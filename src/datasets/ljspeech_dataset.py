@@ -1,7 +1,6 @@
 import torchaudio
 from tqdm.auto import tqdm
 from pathlib import Path
-from librosa.util import normalize
 
 from src.datasets.base_dataset import BaseDataset
 from src.utils.io_utils import ROOT_PATH, read_json, write_json
@@ -66,6 +65,20 @@ class LJSpeechDataset(BaseDataset):
 
         super().__init__(index, *args, **kwargs)
 
+    @staticmethod
+    def _normalize_tensor(tensor, fill_value=0.0):
+        """
+        Analog of librosa.util.normalize
+        """
+        if not torch.all(torch.isfinite(tensor)):
+            return torch.full_like(tensor, fill_value)
+
+        max_val = torch.abs(tensor).max()
+        if max_val > 0:
+            return tensor / max_val
+        else:
+            return torch.zeros_like(tensor)
+
     def __getitem__(self, ind):
         data_dict = self._index[ind]
 
@@ -78,7 +91,7 @@ class LJSpeechDataset(BaseDataset):
             audio_tensor = audio_tensor / MAX_WAV_VALUE
 
             # TODO: check if possible to norm in transforms
-            audio_tensor = normalize(audio_tensor) * 0.95
+            audio_tensor = self._normalize_tensor(audio_tensor) * 0.95
 
             self.cached_wav = audio_tensor
             self._cache_ref_count = self.n_cache_reuse
