@@ -29,8 +29,6 @@ class Trainer(BaseTrainer):
             batch["loss_disc"].backward()
             self._clip_grad_norm()
             self.disc_optimizer.step()
-            if self.disc_lr_scheduler is not None:
-                self.disc_lr_scheduler.step()
 
             # обучение генератора
             for param in self.model.discriminator.parameters():
@@ -45,8 +43,6 @@ class Trainer(BaseTrainer):
             batch["loss_gen"].backward()
             self._clip_grad_norm()
             self.gen_optimizer.step()
-            if self.gen_lr_scheduler is not None:
-                self.gen_lr_scheduler.step()
 
             for param in self.model.discriminator.parameters():
                 param.requires_grad = True
@@ -76,7 +72,10 @@ class Trainer(BaseTrainer):
             self._log_mel(batch)
 
     def _log_mel(self, batch):
-        mel_pred = self.mel_extractor(batch["pred_audio"][0])
+        if "pred_mel" not in batch:
+            mel_pred = self.mel_extractor(batch["pred_audio"][0])
+        else:
+            mel_pred = batch["pred_mel"][0]
 
         self.writer.add_image("mel_real_first", batch["mel"][0])
         self.writer.add_image("mel_pred_first", mel_pred)

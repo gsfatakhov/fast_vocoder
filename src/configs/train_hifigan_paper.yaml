@@ -1,0 +1,38 @@
+defaults:
+  - model: hifigan_paper
+  - writer: wandb_hifigan_paper
+  - metrics: tts
+  - datasets: hifigan_paper
+  - transforms: empty
+  - dataloader: train
+  - _self_
+gen_optimizer:
+  _target_: torch.optim.AdamW
+  betas: [0.8, 0.99]
+  lr: 2e-4
+gen_lr_scheduler:
+  _target_: torch.optim.lr_scheduler.ExponentialLR
+  gamma: 0.999
+disc_optimizer:
+  _target_: torch.optim.AdamW
+  betas: [0.8, 0.99]
+  lr: 2e-4
+disc_lr_scheduler:
+  _target_: torch.optim.lr_scheduler.ExponentialLR
+  gamma: 0.999
+loss_function:
+  _target_: src.loss.HiFiGANPaperLoss
+trainer:
+  log_step: 50
+  n_epochs: 100
+  epoch_len: null
+  device_tensors: ["audio", "mel"] # which tensors should be on device (ex. GPU)
+  resume_from: null # null or path to the checkpoint dir with *.pth and config.yaml
+  device: auto # device name or "auto"
+  override: True # if True, will override the previous run with the same name
+  monitor: "max val_STOI" # "off" or "max/min metric_name", i.e. our goal is to maximize/minimize metric
+  save_period: 5 # checkpoint each save_period epochs in addition to the best epoch
+  early_stop: ${trainer.n_epochs} # epochs for early stopping
+  save_dir: "saved"
+  seed: 7
+  max_grad_norm: 1000.0

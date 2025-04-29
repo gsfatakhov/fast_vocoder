@@ -11,7 +11,7 @@ import librosa
 @dataclass
 class MelSpectrogramConfig:
     sr: int = 22050
-    win_length: int = 256
+    win_length: int = 1024
     hop_length: int = 256
     n_fft: int = 1024
     f_min: int = 0
@@ -25,11 +25,10 @@ class MelSpectrogramConfig:
 
 class MelSpectrogram(nn.Module):
 
-    def __init__(self, config: MelSpectrogramConfig, device: torch.device = torch.device("cpu")):
+    def __init__(self, config: MelSpectrogramConfig):
         super(MelSpectrogram, self).__init__()
 
         self.config = config
-        self.device = device
 
         self.mel_spectrogram = torchaudio.transforms.MelSpectrogram(
             sample_rate=config.sr,
@@ -39,8 +38,7 @@ class MelSpectrogram(nn.Module):
             f_min=config.f_min,
             f_max=config.f_max,
             n_mels=config.n_mels
-            # center=False
-        ).to(self.device)
+        )
 
         # The is no way to set power in constructor in 0.5.0 version.
         self.mel_spectrogram.spectrogram.power = config.power
@@ -54,16 +52,13 @@ class MelSpectrogram(nn.Module):
             fmin=config.f_min,
             fmax=config.f_max
         ).T
-        self.mel_spectrogram.mel_scale.fb.copy_(torch.tensor(mel_basis).to(self.device))
+        self.mel_spectrogram.mel_scale.fb.copy_(torch.tensor(mel_basis))
 
     def forward(self, audio: torch.Tensor) -> torch.Tensor:
         """
         :param audio: Expected shape is [B, T]
         :return: Shape is [B, n_mels, T']
         """
-
-        # добавлено to device
-        audio = audio.to(self.device)
 
         mel = self.mel_spectrogram(audio) \
             .clamp_(min=1e-5) \

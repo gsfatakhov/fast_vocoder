@@ -2,10 +2,8 @@ import torch
 import torch.nn as nn
 
 class GanBaseModel(nn.Module):
-    def __init__(self, device: torch.device, generator: nn.Module, discriminator: nn.Module):
+    def __init__(self, generator: nn.Module, discriminator: nn.Module):
         super().__init__()
-
-        self.device = torch.device(device)
 
         self.generator = generator
         self.discriminator = discriminator
