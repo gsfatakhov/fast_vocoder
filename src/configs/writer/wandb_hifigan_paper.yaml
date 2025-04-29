@@ -1,7 +1,7 @@
 _target_: src.logger.WandBWriter
 project_name: "TTS"
 entity: null
-run_name: "lightvoc_16bs_local"
+run_name: "hifigan_paper_debug"
 mode: "online"
 loss_names: [ "loss_gen", "loss_disc", "loss_gen_adv_mpd", "loss_gen_adv_msd", "loss_gen_fm_mpd", "loss_gen_fm_msd" , "loss_gen_mel" ] # which losses to log (useful for multi-loss tasks, s.a. GANs)
 log_checkpoints: False # set to True if you want to log save_dir with checkpoints to W&B

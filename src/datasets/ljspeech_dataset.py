@@ -45,8 +45,8 @@ class LJSpeechDataset(BaseDataset):
             self.mel_extractor = MelSpectrogram(self.mel_config)
 
             if self.calc_mel_for_loss:
-                self.loss_mel_config = self.mel_config.copy()
-                self.loss_mel_config["f_max"] = fmax_loss
+                self.loss_mel_config = self.mel_config
+                self.loss_mel_config.f_max = fmax_loss
 
                 self.loss_mel_extractor = MelSpectrogram(self.loss_mel_config)
 
