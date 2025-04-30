@@ -7,6 +7,8 @@ import torchaudio
 
 import librosa
 
+import torch.nn.functional as F
+
 
 @dataclass
 class MelSpectrogramConfig:
@@ -32,12 +34,18 @@ class MelSpectrogram(nn.Module):
 
         self.mel_spectrogram = torchaudio.transforms.MelSpectrogram(
             sample_rate=config.sr,
+            n_fft=config.n_fft,
             win_length=config.win_length,
             hop_length=config.hop_length,
-            n_fft=config.n_fft,
             f_min=config.f_min,
             f_max=config.f_max,
-            n_mels=config.n_mels
+            n_mels=config.n_mels,
+            center=False,
+            pad_mode='reflect',
+            power=config.power,
+            normalized=False,
+            onesided=True,
+            norm=None  # нормировка базиса перебьём ниже
         )
 
         # The is no way to set power in constructor in 0.5.0 version.
@@ -56,13 +64,23 @@ class MelSpectrogram(nn.Module):
 
     def forward(self, audio: torch.Tensor) -> torch.Tensor:
         """
-        :param audio: Expected shape is [B, T]
-        :return: Shape is [B, n_mels, T']
+        :param audio: [B, T]
+        :return: [B, n_mels, T_out]
         """
+        if audio.dim() == 3 and audio.size(1) == 1:
+            audio = audio.squeeze(1)
 
+        # 2) Добавляем ручной паддинг как в референсном коде
+        pad_amount = (self.config.n_fft - self.config.hop_length) // 2
+        # pad = (left, right)
+        audio = F.pad(audio.unsqueeze(1),
+                      (pad_amount, pad_amount),
+                      mode='reflect').squeeze(1)
+
+        # Прямое преобразование
         mel = self.mel_spectrogram(audio) \
-            .clamp_(min=1e-5) \
-            .log_()
+            .clamp(min=1e-5) \
+            .log()
 
         return mel
 

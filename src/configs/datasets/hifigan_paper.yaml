@@ -3,7 +3,7 @@ train:
   name: "train"
   audio_path: "/home/georgii/Downloads/LJSpeech-1.1"
   index_audio_path: "/home/georgii/Downloads/LJSpeech-1.1"
-  segment_length: 8191
+  segment_length: 8192
   mel_config:
     _target_: src.utils.MelSpectrogramConfig
     sr: 22050
@@ -24,7 +24,7 @@ val:
   name: "val"
   audio_path: "/home/georgii/Downloads/LJSpeech-1.1"
   index_audio_path: "/home/georgii/Downloads/LJSpeech-1.1"
-  segment_length: 8191
+  segment_length: 8192
   mel_config:
     _target_: src.utils.MelSpectrogramConfig
     sr: 22050

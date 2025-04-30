@@ -38,12 +38,12 @@ mel_extractor: # do not need this, just for comp
 
 trainer:
   log_step: 50
-  n_epochs: 100
+  n_epochs: 1000
   epoch_len: null
   device_tensors: ["audio", "mel", "mel_for_loss"] # which tensors should be on device (ex. GPU)
   resume_from: null # null or path to the checkpoint dir with *.pth and config.yaml
   device: auto # device name or "auto"
-  override: True # if True, will override the previous run with the same name
+  override: False # if True, will override the previous run with the same name
   monitor: "max val_STOI" # "off" or "max/min metric_name", i.e. our goal is to maximize/minimize metric
   save_period: 5 # checkpoint each save_period epochs in addition to the best epoch
   early_stop: ${trainer.n_epochs} # epochs for early stopping
