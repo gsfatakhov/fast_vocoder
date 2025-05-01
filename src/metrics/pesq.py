@@ -36,6 +36,11 @@ class PESQ(BaseMetric):
             audio = self.resampler(audio)
             pred_audio = self.resampler(pred_audio)
 
+        # Привести сигналы к одинаковой длине
+        min_len = min(audio.shape[-1], pred_audio.shape[-1])
+        audio = audio[..., :min_len]
+        pred_audio = pred_audio[..., :min_len]
+
         # Normalize audio
         audio_max = torch.max(torch.abs(audio))
         pred_audio_max = torch.max(torch.abs(pred_audio))
