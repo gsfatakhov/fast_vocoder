@@ -1,40 +1,38 @@
-from src.utils.mel import MelSpectrogram
-from src.model.src_lightvoc.stft import TorchSTFT
+from src.model.src_lightvoc.models import Generator, CoMBD, SBD, MultiResSpecDiscriminator
 
 from src.model.gan_base_model import GanBaseModel
 
-from src.model.src_lightvoc.generator import LightVocGenerator
-from src.model.src_lightvoc.discriminator import LightVocMultiDiscriminator
+import torch.nn as nn
 
 
-class LightVoc(GanBaseModel):
-    def __init__(self, generator_params, discriminator_params, stft_params, mel_config=None):
-        generator = LightVocGenerator(**generator_params)
-        discriminator = LightVocMultiDiscriminator(discriminator_params['combd_params'],
-                                                   discriminator_params['sbd_params'],
-                                                   discriminator_params['mrsd_params'])
+class DiscriminatorModel(nn.Module):
+    def __init__(self, combd_params, sbd_params, mrsd_params):
+        super().__init__()
+
+        self.combd = CoMBD(**combd_params)
+        self.sbd = SBD(**sbd_params)
+        self.combd = MultiResSpecDiscriminator(**mrsd_params)
+
+    def forward(self, real_audio, generated_audio):
+        # audio: [B, 1, T]
+        y_df_hat_r_mpd, y_df_hat_g_mpd, fmap_f_r_mpd, fmap_f_g_mpd = self.mpd(real_audio, generated_audio)
+        y_ds_hat_r_msd, y_ds_hat_g_msd, fmap_s_r_msd, fmap_s_g_msd = self.msd(real_audio, generated_audio)
+
+        return {
+            "MPD": {"y_df_hat_r": y_df_hat_r_mpd, "y_df_hat_g": y_df_hat_g_mpd, "fmap_f_r": fmap_f_r_mpd,
+                    "fmap_f_g": fmap_f_g_mpd},
+            "MSD": {"y_ds_hat_r": y_ds_hat_r_msd, "y_ds_hat_g": y_ds_hat_g_msd, "fmap_s_r": fmap_s_r_msd,
+                    "fmap_s_g": fmap_s_g_msd},
+        }
+
+
+class HiFiGANPaper(GanBaseModel):
+    def __init__(self, generator_params, discriminator_params):
+        generator = Generator(**generator_params)
+        discriminator = DiscriminatorModel(**discriminator_params)
 
         super().__init__(generator, discriminator)
 
-        self.stft = TorchSTFT(filter_length=stft_params.filter_length,
-                              hop_length=stft_params.hop_length,
-                              win_length=stft_params.win_length,
-                              device=stft_params.device,
-                              )
-
-        self.mel_config = mel_config
-        if self.mel_config:
-            self.mel_extractor = MelSpectrogram(self.mel_config)
-
     def forward(self, **batch):
-        if self.mel_config and "mel" not in batch:
-            batch["mel"] = self.mel_extractor(batch["audio"]).squeeze(1).detach()
-
-        spec, phase = self.generator(batch["mel"])
-
-        length = None
-        if "audio" in batch:
-            length = batch["audio"].shape[2]
-
-        batch["pred_audio"] = self.stft.inverse(spec, phase, length=length)
+        batch["pred_audio"] = self.generator(batch["mel"])
         return batch

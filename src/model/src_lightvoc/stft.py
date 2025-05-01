@@ -212,11 +212,11 @@ class TorchSTFT(torch.nn.Module):
 
         return torch.abs(forward_transform), torch.angle(forward_transform)
 
-    def inverse(self, magnitude, phase, length=None):
+    def inverse(self, magnitude, phase):
         magnitude, phase = magnitude.to(self.device), phase.to(self.device)
         inverse_transform = torch.istft(
             magnitude * torch.exp(phase * 1j),
-            self.filter_length, self.hop_length, self.win_length, window=self.window.to(self.device), length=length)
+            self.filter_length, self.hop_length, self.win_length, window=self.window.to(self.device))
 
         return inverse_transform.unsqueeze(-2)  # unsqueeze to stay consistent with conv_transpose1d implementation
 
@@ -224,4 +224,3 @@ class TorchSTFT(torch.nn.Module):
         self.magnitude, self.phase = self.transform(input_data)
         reconstruction = self.inverse(self.magnitude, self.phase)
         return reconstruction
-
