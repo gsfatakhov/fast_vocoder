@@ -70,26 +70,24 @@ class MelSpectrogram(nn.Module):
         if audio.dim() == 3 and audio.size(1) == 1:
             audio = audio.squeeze(1)
 
-        # 2) Добавляем ручной паддинг как в референсном коде
         pad_amount = (self.config.n_fft - self.config.hop_length) // 2
         # pad = (left, right)
         audio = F.pad(audio.unsqueeze(1),
                       (pad_amount, pad_amount),
                       mode='reflect').squeeze(1)
 
-        # Прямое преобразование
         mel = self.mel_spectrogram(audio) \
             .clamp(min=1e-5) \
             .log()
 
         return mel
 
-    def inverse(self, spec: torch.Tensor, phase: torch.Tensor, n_fft : int) -> torch.Tensor:
+    def inverse(self, spec: torch.Tensor, phase: torch.Tensor, n_fft: int) -> torch.Tensor:
         """
-        Reconstruct waveform from provided spectrogram magnitude and phase.
-        :param spec: Magnitude spectrogram of shape [B, n_fft//2+1, T]
-        :param phase: Phase tensor of shape [B, n_fft//2+1, T] (in radians)
-        :return: Reconstructed waveform of shape [B, T_reconstructed]
+        Reconstruct waveform from magnitude+phase, undoing manual padding.
+        :param spec: [B, n_fft//2+1, T]
+        :param phase: [B, n_fft//2+1, T]
+        :return: [B, T_reconstructed == original T]
         """
         # Ensure the inputs are on the correct device.
         spec = spec.to(self.device)
@@ -99,18 +97,25 @@ class MelSpectrogram(nn.Module):
         # Casting spec to complex if needed.
         complex_spec = spec.to(torch.complex64) * torch.exp(1j * phase)
 
-        # Create a Hann window.
-        window = torch.hann_window(self.config.win_length).to(self.device)
+        # Create a Hann window. (win_length == n_fft у вас)
+        window = torch.hann_window(self.config.win_length, device=self.device)
 
-        # Perform the inverse STFT.
+        # Inverse STFT without centering the signal.
+        # to match forward(..., center=False)
         waveform = torch.istft(
             complex_spec,
             n_fft=n_fft,
             hop_length=self.config.hop_length,
             win_length=self.config.win_length,
             window=window,
-            center=True,
+            center=False,
             normalized=False,
             onesided=True
         )
+
+        # Remove manual padding.
+        pad_amount = (self.config.n_fft - self.config.hop_length) // 2
+        if pad_amount > 0:
+            waveform = waveform[..., pad_amount:-pad_amount]
+
         return waveform
