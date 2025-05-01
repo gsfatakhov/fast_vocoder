@@ -5,6 +5,10 @@ from torch.nn import Conv1d, ConvTranspose1d, AvgPool1d, Conv2d
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 from src.model.src_hifigan.utils import init_weights, get_padding
 
+'''
+Copied from https://github.com/jik876/hifi-gan/blob/master/models.py
+'''
+
 LRELU_SLOPE = 0.1
 
 

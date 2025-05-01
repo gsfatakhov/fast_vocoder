@@ -5,6 +5,9 @@ import torch
 from torch.nn.utils import weight_norm
 matplotlib.use("Agg")
 import matplotlib.pylab as plt
+'''
+Copied from https://github.com/jik876/hifi-gan/blob/master/models.py
+'''
 
 
 def plot_spectrogram(spectrogram):
