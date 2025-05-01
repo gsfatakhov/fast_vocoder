@@ -1,12 +1,12 @@
 defaults:
-  - model: lightvoc
+  - model: hifigan_paper
   - metrics: test
-  - transforms: example_only_batch
+  - transforms: empty
   - _self_
 dataloader:
   _target_: torch.utils.data.DataLoader
   batch_size: 1
-  num_workers: 8
+  num_workers: 4
   pin_memory: True
 datasets:
   test:
@@ -15,6 +15,7 @@ datasets:
     audio_path: "datasets/vocoder_dataset"
     index_audio_path: ${datasets.test.audio_path}
     segment_length: null
+    target_sr: 22050
     mel_config:
       _target_: src.utils.MelSpectrogramConfig
       sr: 22050
@@ -28,7 +29,7 @@ datasets:
       pad_value: -11.5129251
 inferencer:
   device_tensors: ["audio", "mel"] # which tensors should be on device (ex. GPU)
-  device: auto # device name or "auto"
+  device: "auto" # device name or "auto"
   save_path: "resynthesize_results" # any name here, can be a dataset name
-  seed: 7
+  seed: 42
   from_pretrained: "/Users/georgijfatahov/Downloads/lightvoc_176bs_server/model_best.pth" # path to the pretrained model

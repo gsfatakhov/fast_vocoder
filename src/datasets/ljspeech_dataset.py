@@ -8,7 +8,9 @@ from src.utils.io_utils import ROOT_PATH, read_json, write_json
 import torch
 import torch.nn.functional as F
 
-from src.utils.mel import MelSpectrogram, MelSpectrogramConfig
+from src.utils.mel import MelSpectrogram
+
+MAX_WAV_VALUE = 32768.0
 
 
 class LJSpeechDataset(BaseDataset):
@@ -21,6 +23,9 @@ class LJSpeechDataset(BaseDataset):
             use_normalized_text=True,
             segment_length=8192,
             mel_config=None,
+            calc_mel_for_loss=False,
+            fmax_loss=None,
+            n_cache_reuse=0,
             *args, **kwargs
     ):
         self.name = name
@@ -29,9 +34,20 @@ class LJSpeechDataset(BaseDataset):
         self.use_normalized_text = use_normalized_text
         self.segment_length = segment_length
 
+        self.cached_wav = None
+        self.n_cache_reuse = n_cache_reuse
+        self._cache_ref_count = 0
+
         self.mel_config = mel_config
+        self.calc_mel_for_loss = calc_mel_for_loss
         if self.mel_config:
             self.mel_extractor = MelSpectrogram(self.mel_config)
+
+            if self.calc_mel_for_loss:
+                self.loss_mel_config = self.mel_config
+                self.loss_mel_config.f_max = fmax_loss
+
+                self.loss_mel_extractor = MelSpectrogram(self.loss_mel_config)
 
         if not index_audio_path:
             index_audio_path = self.audio_path
@@ -49,6 +65,20 @@ class LJSpeechDataset(BaseDataset):
 
         super().__init__(index, *args, **kwargs)
 
+    @staticmethod
+    def _normalize_tensor(tensor, fill_value=0.0):
+        """
+        Analog of librosa.util.normalize
+        """
+        if not torch.all(torch.isfinite(tensor)):
+            return torch.full_like(tensor, fill_value)
+
+        max_val = torch.abs(tensor).max()
+        if max_val > 0:
+            return tensor / max_val
+        else:
+            return torch.zeros_like(tensor)
+
     def __getitem__(self, ind):
         data_dict = self._index[ind]
 
@@ -56,7 +86,18 @@ class LJSpeechDataset(BaseDataset):
         text = data_dict["text"]
         audio_name = data_dict["audio_name"]
 
-        audio_tensor = self.load_audio(audio_path)
+        if self._cache_ref_count == 0:
+            audio_tensor = self.load_audio(audio_path)
+            audio_tensor = audio_tensor / MAX_WAV_VALUE
+
+            # TODO: check if possible to norm in transforms
+            audio_tensor = self._normalize_tensor(audio_tensor) * 0.95
+
+            self.cached_wav = audio_tensor
+            self._cache_ref_count = self.n_cache_reuse
+        else:
+            audio_tensor = self.cached_wav
+            self._cache_ref_count -= 1
 
         if self.name == "train":
             if audio_tensor.shape[-1] >= self.segment_length:
@@ -79,8 +120,6 @@ class LJSpeechDataset(BaseDataset):
                 diff = test_length - audio_tensor.shape[-1]
                 audio_tensor = F.pad(audio_tensor, (0, diff))
 
-
-
         instance_data = {
             "audio": audio_tensor,
             "text": text,
@@ -89,18 +128,22 @@ class LJSpeechDataset(BaseDataset):
 
         if self.mel_config:
             instance_data["mel"] = self.mel_extractor(audio_tensor)  # [B, n_mels, T']
+            if self.calc_mel_for_loss:
+                instance_data["mel_for_loss"] = self.loss_mel_extractor(audio_tensor)
 
         instance_data = self.preprocess_data(instance_data)
 
         return instance_data
 
     def load_audio(self, path):
+        # audio_tensor shape [C, T]
         audio_tensor, sr = torchaudio.load(path)
-        # Берем только один канал
-        audio_tensor = audio_tensor[0:1, :]
-        target_sr = self.target_sr
-        if sr != target_sr:
-            audio_tensor = torchaudio.functional.resample(audio_tensor, sr, target_sr)
+        # means to [1, T]
+        audio_tensor = audio_tensor.mean(dim=0, keepdim=True)
+
+        if sr != self.target_sr:
+            # audio_tensor = torchaudio.functional.resample(audio_tensor, sr, self.target_sr)
+            raise ValueError("{} SR doesn't match target {} SR".format(sr, self.target_sr))
         return audio_tensor
 
     def _create_index(self):

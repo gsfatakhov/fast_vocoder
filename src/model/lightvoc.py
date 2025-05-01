@@ -1,5 +1,3 @@
-import torch
-
 from src.utils.mel import MelSpectrogram
 from src.model.src_lightvoc.stft import TorchSTFT
 
@@ -10,24 +8,23 @@ from src.model.src_lightvoc.discriminator import LightVocMultiDiscriminator
 
 
 class LightVoc(GanBaseModel):
-    def __init__(self, device, generator_params, discriminator_params, stft_params, mel_config=None):
-        device = torch.device(device)
-
+    def __init__(self, generator_params, discriminator_params, stft_params, mel_config=None):
         generator = LightVocGenerator(**generator_params)
         discriminator = LightVocMultiDiscriminator(discriminator_params['combd_params'],
-                                                         discriminator_params['sbd_params'],
-                                                         discriminator_params['mrsd_params'])
+                                                   discriminator_params['sbd_params'],
+                                                   discriminator_params['mrsd_params'])
 
-        super().__init__(device, generator, discriminator)
+        super().__init__(generator, discriminator)
 
         self.stft = TorchSTFT(filter_length=stft_params.filter_length,
                               hop_length=stft_params.hop_length,
                               win_length=stft_params.win_length,
-                              device=self.device).to(self.device)
+                              device=stft_params.device,
+                              )
 
         self.mel_config = mel_config
         if self.mel_config:
-            self.mel_extractor = MelSpectrogram(self.mel_config, device=self.device)
+            self.mel_extractor = MelSpectrogram(self.mel_config)
 
     def forward(self, **batch):
         if self.mel_config and "mel" not in batch:
@@ -41,15 +38,3 @@ class LightVoc(GanBaseModel):
 
         batch["pred_audio"] = self.stft.inverse(spec, phase, length=length)
         return batch
-
-    def __str__(self):
-        all_parameters = sum(p.numel() for p in self.parameters())
-        trainable_parameters = sum(p.numel() for p in self.parameters() if p.requires_grad)
-        gen_params = sum(p.numel() for p in self.generator.parameters())
-        disc_params = sum(p.numel() for p in self.discriminator.parameters())
-        info = super().__str__()
-        info += f"\nAll parameters: {all_parameters}"
-        info += f"\nTrainable parameters: {trainable_parameters}"
-        info += f"\nGenerator parameters: {gen_params}"
-        info += f"\nDiscriminator parameters: {disc_params}"
-        return info

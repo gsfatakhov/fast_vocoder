@@ -56,7 +56,7 @@ def main(config):
     disc_lr_scheduler = instantiate(config.disc_lr_scheduler, optimizer=disc_optimizer)
 
     #TODO: make it global params
-    mel_extractor = instantiate(config.mel_extractor)
+    mel_extractor = instantiate(config.mel_extractor).to(device)
 
     # epoch_len = number of iterations for iteration-based training
     # epoch_len = None or len(dataloader) for epoch-based training

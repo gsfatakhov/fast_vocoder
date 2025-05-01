@@ -24,6 +24,11 @@ class STOI(BaseMetric):
             audio_combined = torch.cat([x.squeeze(0) for x in audio_group], dim=-1)
             pred_audio_combined = torch.cat([x.squeeze(0) for x in pred_audio_group], dim=-1)
 
+            # Привести сигналы к одинаковой длине
+            min_len = min(audio_combined.shape[-1], pred_audio_combined.shape[-1])
+            audio_combined = audio_combined[..., :min_len]
+            pred_audio_combined = pred_audio_combined[..., :min_len]
+
             audio_combined = audio_combined / torch.max(torch.abs(audio_combined))
             pred_audio_combined = pred_audio_combined / torch.max(torch.abs(pred_audio_combined))
 
