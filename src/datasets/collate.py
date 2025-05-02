@@ -19,6 +19,9 @@ def collate_fn(dataset_items: list[dict]):
         mels = [item["mel"] for item in dataset_items]
         out["mel"] = torch.stack(mels, dim=0).squeeze(1)  # [B, n_m, T]
 
+        lengths = [item["length"] for item in dataset_items]
+        out["length"] = torch.stack(lengths, dim=0).squeeze(1)
+
         if "mel_for_loss" in dataset_items[0]:
             mels_for_loss = [item["mel_for_loss"] for item in dataset_items]
             out["mel_for_loss"] = torch.stack(mels_for_loss, dim=0).squeeze(1)

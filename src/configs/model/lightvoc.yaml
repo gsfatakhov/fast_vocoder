@@ -1,6 +1,10 @@
 _target_: src.model.LightVoc
 
 generator_params:
+  h:
+    upsample_initial_channel: 512
+    gen_istft_n_fft: 1024
+    gen_istft_hop_size: 256
 
 discriminator_params:
   pqmf_config:
@@ -12,7 +16,7 @@ discriminator_params:
       combd_d_k: [[ 7, 11, 11, 11, 11, 5 ],[ 11, 21, 21, 21, 21, 5 ],[ 15, 41, 41, 41, 41, 5 ]]
       combd_d_s: [[ 1, 1, 4, 4, 4, 1 ],[ 1, 1, 4, 4, 4, 1 ],[ 1, 1, 4, 4, 4, 1 ]]
       combd_d_d: [[ 1, 1, 1, 1, 1, 1 ],[ 1, 1, 1, 1, 1, 1 ],[ 1, 1, 1, 1, 1, 1 ]]
-      combd_d_g: [[ 1, 4, 16, 64, 256, 1 ],[ 1, 4, 16, 64, 256, 1 ],[ 1, 4, 16, 64, 256, 1 ]],
+      combd_d_g: [[ 1, 4, 16, 64, 256, 1 ],[ 1, 4, 16, 64, 256, 1 ],[ 1, 4, 16, 64, 256, 1 ]]
       combd_d_p: [[ 3, 5, 5, 5, 5, 2 ],[ 5, 10, 10, 10, 10, 2 ],[ 7, 20, 20, 20, 20, 2 ]]
 
       combd_op_f: [ 1, 1, 1 ]
@@ -32,5 +36,8 @@ discriminator_params:
         fsbd: [ 64, 256, 0.1, 9.0 ]
       segment_size: 8192
 
-
 stft_params:
+  filter_length: 1024
+  hop_length: 256
+  win_length: 1024
+  device: "cuda"

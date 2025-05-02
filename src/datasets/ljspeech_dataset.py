@@ -101,10 +101,15 @@ class LJSpeechDataset(BaseDataset):
 
         if self.name == "train":
             if audio_tensor.shape[-1] >= self.segment_length:
+                if self.mel_config:
+                    # length without padding for attn
+                    length_mel = torch.LongTensor([ self.segment_length // self.mel_config.hop_length])
                 max_start = audio_tensor.shape[-1] - self.segment_length
                 start = torch.randint(0, max_start + 1, (1,)).item()
                 audio_tensor = audio_tensor[:, start:start + self.segment_length]
             else:
+                if self.mel_config:
+                    length_mel = torch.LongTensor([audio_tensor.shape[-1] // self.mel_config.hop_length])
                 diff = self.segment_length - audio_tensor.shape[-1]
                 audio_tensor = F.pad(audio_tensor, (0, diff))
 
@@ -115,8 +120,13 @@ class LJSpeechDataset(BaseDataset):
                 # pad to max length
                 test_length = audio_tensor.shape[-1]
             if audio_tensor.shape[-1] > test_length:
+                if self.mel_config:
+                    # length without padding for attn
+                    length_mel = torch.LongTensor([test_length // self.mel_config.hop_length])
                 audio_tensor = audio_tensor[:, :test_length]
             else:
+                if self.mel_config:
+                    length_mel = torch.LongTensor([audio_tensor.shape[-1] // self.mel_config.hop_length])
                 diff = test_length - audio_tensor.shape[-1]
                 audio_tensor = F.pad(audio_tensor, (0, diff))
 
@@ -128,6 +138,7 @@ class LJSpeechDataset(BaseDataset):
 
         if self.mel_config:
             instance_data["mel"] = self.mel_extractor(audio_tensor)  # [B, n_mels, T']
+            instance_data["length"] = length_mel
             if self.calc_mel_for_loss:
                 instance_data["mel_for_loss"] = self.loss_mel_extractor(audio_tensor)
 

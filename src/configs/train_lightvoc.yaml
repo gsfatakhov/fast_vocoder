@@ -1,11 +1,11 @@
 defaults:
   - model: lightvoc
-  - writer: wandb_hifigan_paper
+  - writer: wandb_lightvoc
   - metrics: tts
   - datasets: hifigan_paper
   - transforms: empty
   - dataloader: train
-  - loss_function: hifigan_paper
+  - loss_function: lightvoc
   - _self_
 gen_optimizer:
   _target_: torch.optim.AdamW
@@ -40,10 +40,10 @@ trainer:
   log_step: 50
   n_epochs: 1000
   epoch_len: null
-  device_tensors: ["audio", "mel", "mel_for_loss"] # which tensors should be on device (ex. GPU)
+  device_tensors: ["audio", "mel", "mel_for_loss", "length"] # which tensors should be on device (ex. GPU)
   resume_from: null # null or path to the checkpoint dir with *.pth and config.yaml
   device: auto # device name or "auto"
-  override: False # if True, will override the previous run with the same name
+  override: True # if True, will override the previous run with the same name
   monitor: "max val_STOI" # "off" or "max/min metric_name", i.e. our goal is to maximize/minimize metric
   save_period: 5 # checkpoint each save_period epochs in addition to the best epoch
   early_stop: ${trainer.n_epochs} # epochs for early stopping

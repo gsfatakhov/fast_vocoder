@@ -120,7 +120,8 @@ class PQMF(torch.nn.Module):
             Tensor: Output tensor (B, subbands, T // subbands).
         """
         x = F.conv1d(self.pad_fn(x), self.analysis_filter.to(x.device))
-        return F.conv1d(x, self.updown_filter.to(x.device), stride=self.subbands.to(x.device))
+        # fixed to device
+        return F.conv1d(x, self.updown_filter.to(x.device), stride=self.subbands).to(x.device)
 
     def synthesis(self, x):
         """Synthesis with PQMF.
