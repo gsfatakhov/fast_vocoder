@@ -2,7 +2,7 @@ _target_: src.model.LightVoc
 
 generator_params:
   h:
-    upsample_initial_channel: 512
+    upsample_initial_channel: 256 # in ref repo 512
     gen_istft_n_fft: 1024
     gen_istft_hop_size: 256
 

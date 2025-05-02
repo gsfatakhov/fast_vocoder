@@ -23,7 +23,7 @@ class Generator(torch.nn.Module):
         self.conv_pre = weight_norm(Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3))
         self.conformer = Conformer(input_dim=h.upsample_initial_channel, num_heads=8, ffn_dim=256, num_layers=2, depthwise_conv_kernel_size=31, dropout=0.1)
         self.post_n_fft = h.gen_istft_n_fft
-        self.conv_post = weight_norm(Conv1d(512, self.post_n_fft + 2, 7, 1, padding=3))
+        self.conv_post = weight_norm(Conv1d(h.upsample_initial_channel, self.post_n_fft + 2, 7, 1, padding=3))
         self.conv_post.apply(init_weights)
         self.reflection_pad = torch.nn.ReflectionPad1d((1, 0))
 
