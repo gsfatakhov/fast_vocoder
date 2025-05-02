@@ -1,4 +1,6 @@
 from src.model.src_lightvoc.models import Generator, CoMBD, SBD, MultiResSpecDiscriminator
+from src.model.src_lightvoc.stft import TorchSTFT
+from src.model.src_lightvoc.pqmf import PQMF
 
 from src.model.gan_base_model import GanBaseModel
 
@@ -6,33 +8,65 @@ import torch.nn as nn
 
 
 class DiscriminatorModel(nn.Module):
-    def __init__(self, combd_params, sbd_params, mrsd_params):
+    def __init__(self, pqmf_config, combd_params, sbd_params):
         super().__init__()
 
-        self.combd = CoMBD(**combd_params)
+        subbands2, taps2, cutoff_ratio2, beta2 = pqmf_config["lv2"]
+        subbands1, taps1, cutoff_ratio1, beta1 = pqmf_config["lv2"]
+        pqmf_lv2 = PQMF(subbands2, taps2, cutoff_ratio2, beta2)
+        pqmf_lv1 = PQMF(subbands1, taps1, cutoff_ratio1, beta1)
+
+        self.combd = CoMBD(pqmf_list=[pqmf_lv2, pqmf_lv1], **combd_params)
         self.sbd = SBD(**sbd_params)
-        self.combd = MultiResSpecDiscriminator(**mrsd_params)
+        self.msd = MultiResSpecDiscriminator()
 
     def forward(self, real_audio, generated_audio):
         # audio: [B, 1, T]
-        y_df_hat_r_mpd, y_df_hat_g_mpd, fmap_f_r_mpd, fmap_f_g_mpd = self.mpd(real_audio, generated_audio)
-        y_ds_hat_r_msd, y_ds_hat_g_msd, fmap_s_r_msd, fmap_s_g_msd = self.msd(real_audio, generated_audio)
+
+        # if use this, need to add some conv in generator, follow: https://github.com/ncsoft/avocodo/blob/2999557bbd040a6f3eb6f7006a317d89537b78cd/avocodo/models/generator.py#L109
+        # in this implement, only last conv is used
+
+        # ys = [
+        #     pqmf_lv2.analysis(
+        #         y
+        #     )[:, :h.projection_filters[1]],
+        #     pqmf_lv1.analysis(
+        #         y
+        #     )[:, :h.projection_filters[2]],
+        #     y
+        # ]
+        ys = [real_audio]
+
+        y_du_hat_r, y_du_hat_g, fmap_u_r, fmap_u_g = self.combd(ys, generated_audio)
+        y_dp_hat_r, y_dp_hat_g, fmap_p_r, fmap_p_g = self.sbd(real_audio, generated_audio)
+        y_ds_hat_r, y_ds_hat_g, fmap_s_r, fmap_s_g = self.msd(real_audio, generated_audio)
 
         return {
-            "MPD": {"y_df_hat_r": y_df_hat_r_mpd, "y_df_hat_g": y_df_hat_g_mpd, "fmap_f_r": fmap_f_r_mpd,
-                    "fmap_f_g": fmap_f_g_mpd},
-            "MSD": {"y_ds_hat_r": y_ds_hat_r_msd, "y_ds_hat_g": y_ds_hat_g_msd, "fmap_s_r": fmap_s_r_msd,
-                    "fmap_s_g": fmap_s_g_msd},
+            "CoMBD": {"y_du_hat_r": y_du_hat_r, "y_du_hat_g": y_du_hat_g, "fmap_u_r": fmap_u_r,
+                      "fmap_u_g": fmap_u_g},
+            "SBD": {"y_dp_hat_r": y_dp_hat_r, "y_dp_hat_g": y_dp_hat_g, "fmap_p_r": fmap_p_r,
+                    "fmap_p_g": fmap_p_g},
+            "MSD": {"y_ds_hat_r": y_ds_hat_r, "y_ds_hat_g": y_ds_hat_g, "fmap_s_r": fmap_s_r,
+                    "fmap_s_g": fmap_s_g},
         }
 
 
-class HiFiGANPaper(GanBaseModel):
-    def __init__(self, generator_params, discriminator_params):
+class LightVoc(GanBaseModel):
+    def __init__(self, generator_params, discriminator_params, stft_params):
         generator = Generator(**generator_params)
         discriminator = DiscriminatorModel(**discriminator_params)
+
+        self.stft = TorchSTFT(**stft_params)
 
         super().__init__(generator, discriminator)
 
     def forward(self, **batch):
-        batch["pred_audio"] = self.generator(batch["mel"])
+        length = batch["mel"].shape[-1]
+        x = batch["mel"]
+
+        spec, phase = self.generator(x, length)
+
+        y_g_hat = self.stft.inverse(spec, phase)
+
+        batch["pred_audio"] = y_g_hat
         return batch
