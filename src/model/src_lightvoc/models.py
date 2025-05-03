@@ -25,7 +25,6 @@ class Generator(torch.nn.Module):
         self.post_n_fft = h.gen_istft_n_fft
         self.conv_post = weight_norm(Conv1d(h.upsample_initial_channel, self.post_n_fft + 2, 7, 1, padding=3))
         self.conv_post.apply(init_weights)
-        self.reflection_pad = torch.nn.ReflectionPad1d((1, 0))
 
 
     def forward(self, x, length):
@@ -37,7 +36,6 @@ class Generator(torch.nn.Module):
         x, _ = self.conformer(x, length)
         x = einops.rearrange(x, 'b t f -> b f t') #1 x 512 x time
         x = F.leaky_relu(x)
-        x = self.reflection_pad(x)
         x = self.conv_post(x)  # 1 x 18 x time
         spec = torch.exp(x[:,:self.post_n_fft // 2 + 1, :])
         phase = torch.sin(x[:, self.post_n_fft // 2 + 1:, :])

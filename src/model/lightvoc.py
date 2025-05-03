@@ -1,5 +1,5 @@
 from src.model.src_lightvoc.models import Generator, CoMBD, SBD, MultiResSpecDiscriminator
-from src.model.src_lightvoc.stft import TorchSTFT
+from src.utils.mel import MelSpectrogram
 from src.model.src_lightvoc.pqmf import PQMF
 
 from src.model.gan_base_model import GanBaseModel
@@ -55,13 +55,13 @@ class DiscriminatorModel(nn.Module):
 
 
 class LightVoc(GanBaseModel):
-    def __init__(self, generator_params, discriminator_params, stft_params):
+    def __init__(self, generator_params, discriminator_params, mel_config):
         generator = Generator(**generator_params)
         discriminator = DiscriminatorModel(**discriminator_params)
 
         super().__init__(generator, discriminator)
 
-        self.stft = TorchSTFT(**stft_params)
+        self.mel_extractor = MelSpectrogram(mel_config)
 
     def forward(self, **batch):
         x = batch["mel"]
@@ -69,7 +69,6 @@ class LightVoc(GanBaseModel):
 
         spec, phase = self.generator(x, length)
 
-        y_g_hat = self.stft.inverse(spec, phase)
+        batch["pred_audio"] = self.mel_extractor.inverse(spec, phase).unsqueeze(1)
 
-        batch["pred_audio"] = y_g_hat
         return batch
