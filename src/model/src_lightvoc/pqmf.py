@@ -1,3 +1,8 @@
+# -*- coding: utf-8 -*-
+
+# Copyright 2020 Tomoki Hayashi
+#  MIT License (https://opensource.org/licenses/MIT)
+
 """Pseudo QMF modules."""
 '''
 Copied from https://github.com/kan-bayashi/ParallelWaveGAN/blob/master/parallel_wavegan/layers/pqmf.py
@@ -31,7 +36,7 @@ def design_prototype_filter(taps=62, cutoff_ratio=0.142, beta=9.0):
     omega_c = np.pi * cutoff_ratio
     with np.errstate(invalid="ignore"):
         h_i = np.sin(omega_c * (np.arange(taps + 1) - 0.5 * taps)) / (
-                np.pi * (np.arange(taps + 1) - 0.5 * taps)
+            np.pi * (np.arange(taps + 1) - 0.5 * taps)
         )
     h_i[taps // 2] = np.cos(0) * cutoff_ratio  # fix nan due to indeterminate form
 
@@ -64,28 +69,29 @@ class PQMF(torch.nn.Module):
         # build analysis & synthesis filter coefficients
         h_proto = design_prototype_filter(taps, cutoff_ratio, beta)
 
+        
         h_analysis = np.zeros((subbands, len(h_proto)))
         h_synthesis = np.zeros((subbands, len(h_proto)))
         for k in range(subbands):
             h_analysis[k] = (
-                    2
-                    * h_proto
-                    * np.cos(
-                (2 * k + 1)
-                * (np.pi / (2 * subbands))
-                * (np.arange(taps + 1) - (taps / 2))
-                + (-1) ** k * np.pi / 4
-            )
+                2
+                * h_proto
+                * np.cos(
+                    (2 * k + 1)
+                    * (np.pi / (2 * subbands))
+                    * (np.arange(taps + 1) - (taps / 2))
+                    + (-1) ** k * np.pi / 4
+                )
             )
             h_synthesis[k] = (
-                    2
-                    * h_proto
-                    * np.cos(
-                (2 * k + 1)
-                * (np.pi / (2 * subbands))
-                * (np.arange(taps + 1) - (taps / 2))
-                - (-1) ** k * np.pi / 4
-            )
+                2
+                * h_proto
+                * np.cos(
+                    (2 * k + 1)
+                    * (np.pi / (2 * subbands))
+                    * (np.arange(taps + 1) - (taps / 2))
+                    - (-1) ** k * np.pi / 4
+                )
             )
 
         # convert to tensor
@@ -113,12 +119,9 @@ class PQMF(torch.nn.Module):
         Returns:
             Tensor: Output tensor (B, subbands, T // subbands).
         """
-
         x = F.conv1d(self.pad_fn(x), self.analysis_filter.to(x.device))
-
-        out = F.conv1d(x, self.updown_filter.to(x.device), stride=self.subbands)
-
-        return out
+        # fixed to device
+        return F.conv1d(x, self.updown_filter.to(x.device), stride=self.subbands).to(x.device)
 
     def synthesis(self, x):
         """Synthesis with PQMF.

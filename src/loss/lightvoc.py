@@ -1,94 +1,115 @@
 import torch
+import torch.nn.functional as F
 
 from src.loss.gan_base_loss import GanBaseLoss
-import torch.nn.functional as F
 from src.utils.mel import MelSpectrogram
 
 
 class LightVocLoss(GanBaseLoss):
-    def __init__(self, gen_stft_loss, model, lambda_adv, lambda_rec, lambda_feature, mel_config=None):
+    def __init__(self, model, mel_config):
         super().__init__(model)
+        self.mel_extractor = MelSpectrogram(mel_config)
 
-        self.lambda_adv = lambda_adv
-        self.lambda_rec = lambda_rec
-        self.lambda_feature = lambda_feature
-
-        self.gen_stft_loss = gen_stft_loss
-
-        self.mel_extractor = None
-        if mel_config:
-            self.mel_extractor = MelSpectrogram(mel_config, device=model.device)
-
-    def _feature_loss(self, fmap_r, fmap_g):
+    @staticmethod
+    def _feature_loss(fmap_r, fmap_g):
         loss = 0
         for dr, dg in zip(fmap_r, fmap_g):
             for rl, gl in zip(dr, dg):
                 loss += torch.mean(torch.abs(rl - gl))
 
-        return loss
+        return loss * 2
 
-    def _discriminator_loss(self, disc_real_outputs, disc_generated_outputs):
+    @staticmethod
+    def _discriminator_loss(disc_real_outputs, disc_generated_outputs):
         loss = 0
+        r_losses = []
+        g_losses = []
         for dr, dg in zip(disc_real_outputs, disc_generated_outputs):
             r_loss = torch.mean((1 - dr) ** 2)
             g_loss = torch.mean(dg ** 2)
-            loss += r_loss + g_loss
+            loss += (r_loss + g_loss)
+            r_losses.append(r_loss.item())
+            g_losses.append(g_loss.item())
 
-        return loss
+        return loss, r_losses, g_losses
 
-    def _gen_adv_loss(self, disc_outputs):
+    @staticmethod
+    def _generator_loss(disc_outputs):
         loss = 0
+        gen_losses = []
         for dg in disc_outputs:
             l = torch.mean((1 - dg) ** 2)
+            gen_losses.append(l)
             loss += l
 
-        return loss
+        return loss, gen_losses
 
     def forward(self, compute_generator_loss=True, compute_discriminator_loss=True, **batch):
         real_audio = batch["audio"]  # [B, 1, T]
         pred_audio = batch["pred_audio"]  # [B, 1, T'] (T' обычно может немного отличаться от T)
 
-        discrimators_results = self._discriminate(real_audio, pred_audio)
-
-        # {
-        #  "CoMBD": {"y_d_rs": outs_real, "y_d_gs": outs_fake, "fmap_rs": f_maps_real, "fmap_gs": f_maps_fake},
-        #  "SBD": {"y_d_rs": y_d_rs_sbd, "y_d_gs": y_d_gs_sbd, "fmap_rs": fmap_rs_sbd, "fmap_gs": fmap_gs_sbd},
-        #  "MRSD": {"y_d_rs": y_d_rs_mrsd, "y_d_gs": y_d_gs_mrsd, "fmap_rs": fmap_rs_mrsd, "fmap_gs": fmap_gs_mrsd},
+        # return {
+        #     "CoMBD": {"y_du_hat_r": y_du_hat_r, "y_du_hat_g": y_du_hat_g, "fmap_u_r": fmap_u_r,
+        #               "fmap_u_g": fmap_u_g},
+        #     "SBD": {"y_dp_hat_r": y_dp_hat_r, "y_dp_hat_g": y_dp_hat_g, "fmap_p_r": fmap_p_r,
+        #             "fmap_p_g": fmap_p_g},
+        #     "MSD": {"y_ds_hat_r": y_ds_hat_r, "y_ds_hat_g": y_ds_hat_g, "fmap_s_r": fmap_s_r,
+        #             "fmap_s_g": fmap_s_g},
         # }
+
+        # pred_audio already detached in Trainer for discriminator training
+        disc_results = self._discriminate(real_audio, pred_audio)
 
         out = {}
         if compute_generator_loss:
-            # Adversarial loss
-            adv_loss = 0.0
-            for result in discrimators_results:
-                adv_loss += self._gen_adv_loss(discrimators_results[result]["y_d_gs"])
-            adv_loss /= len(discrimators_results)
+            # L1 Mel-Spectrogram Loss
+            # "mel_for_loss" calculates on CPU in Dataset class if passed mel_conf and calc_mel_for_loss params
+            batch["pred_mel"] = self.mel_extractor(pred_audio)
+            loss_mel = F.l1_loss(batch["mel_for_loss"], batch["pred_mel"]) * 45
 
-            # Stft loss
-            # aux_loss = self.gen_stft_loss(real_audio, pred_audio)
+            # y_du_hat_r, y_du_hat_g, fmap_u_r, fmap_u_g = combd(ys, ys_hat)
+            y_du_hat_r, y_du_hat_g, fmap_u_r, fmap_u_g = disc_results["CoMBD"]["y_du_hat_r"], disc_results["CoMBD"][
+                "y_du_hat_g"], disc_results["CoMBD"]["fmap_u_r"], disc_results["CoMBD"]["fmap_u_g"]
 
-            pred_audio_mel = self.mel_extractor(pred_audio)
-            aux_loss = F.l1_loss(batch["mel"], pred_audio_mel)
+            # y_dp_hat_r, y_dp_hat_g, fmap_p_r, fmap_p_g = sbd(y, y_g_hat)
+            y_dp_hat_r, y_dp_hat_g, fmap_p_r, fmap_p_g = disc_results["SBD"]["y_dp_hat_r"], disc_results["SBD"][
+                "y_dp_hat_g"], disc_results["SBD"]["fmap_p_r"], disc_results["SBD"]["fmap_p_g"]
 
-            # Feature matching loss
-            fm_loss = 0.0
-            for result in discrimators_results:
-                fm_loss += self._feature_loss(discrimators_results[result]["fmap_rs"],
-                                              discrimators_results[result]["fmap_gs"])
-            fm_loss /= len(discrimators_results)
+            # y_ds_hat_r, y_ds_hat_g, fmap_s_r, fmap_s_g = msd(y, y_g_hat)
+            y_ds_hat_r, y_ds_hat_g, fmap_s_r, fmap_s_g = disc_results["MSD"]["y_ds_hat_r"], disc_results["MSD"][
+                "y_ds_hat_g"], disc_results["MSD"]["fmap_s_r"], disc_results["MSD"]["fmap_s_g"]
+
+            loss_fm_u = self._feature_loss(fmap_u_r, fmap_u_g)
+            loss_fm_p = self._feature_loss(fmap_p_r, fmap_p_g)
+            loss_fm_s = self._feature_loss(fmap_s_r, fmap_s_g)
+
+            loss_gen_u, losses_gen_u = self._generator_loss(y_du_hat_g)
+            loss_gen_p, losses_gen_p = self._generator_loss(y_dp_hat_g)
+            loss_gen_s, losses_gen_s = self._generator_loss(y_ds_hat_g)
 
             # Resulting loss
-            out["loss_gen_rec"] = aux_loss
-            out["loss_gen_fm"] = fm_loss
-            out["loss_gen_adv"] = adv_loss
+            out["loss_gen_adv"] = loss_gen_s + loss_gen_p + loss_gen_u
 
-            out["loss_gen"] = self.lambda_rec * aux_loss + self.lambda_feature * fm_loss + self.lambda_adv * adv_loss
+            out["loss_gen_fm"] = loss_fm_s + loss_fm_u + loss_fm_p
+
+            out["loss_gen_mel"] = loss_mel
+
+            out["loss_gen"] = out["loss_gen_adv"] + out["loss_gen_fm"] + out["loss_gen_mel"]
 
         if compute_discriminator_loss:
-            out["loss_disc"] = 0.0
+            # combd
+            # ys list length 1 contain y shape batch x 1 x segment_size
+            # y_g_hat shape batch x 1 x segment_size
+            y_du_hat_r, y_du_hat_g = disc_results["CoMBD"]["y_du_hat_r"], disc_results["CoMBD"]["y_du_hat_g"]
+            loss_disc_u, losses_disc_u_r, losses_disc_u_g = self._discriminator_loss(y_du_hat_r, y_du_hat_g)
 
-            for result in discrimators_results:
-                out["loss_disc"] += self._discriminator_loss(discrimators_results[result]["y_d_rs"],
-                                                             discrimators_results[result]["y_d_gs"])
-            out["loss_disc"] /= len(discrimators_results)
+            # sbd
+            y_dp_hat_r, y_dp_hat_g = disc_results["SBD"]["y_dp_hat_r"], disc_results["SBD"]["y_dp_hat_g"]
+            loss_disc_p, losses_disc_p_r, losses_disc_p_g = self._discriminator_loss(y_dp_hat_r, y_dp_hat_g)
+
+            # MSD
+            y_ds_hat_r, y_ds_hat_g = disc_results["MSD"]["y_ds_hat_r"], disc_results["MSD"]["y_ds_hat_g"]
+            loss_disc_s, losses_disc_s_r, losses_disc_s_g = self._discriminator_loss(y_ds_hat_r, y_ds_hat_g)
+
+            out["loss_disc"] = loss_disc_s + loss_disc_p + loss_disc_u
         return out
