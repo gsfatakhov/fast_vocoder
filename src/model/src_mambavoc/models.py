@@ -14,8 +14,10 @@ from mamba_ssm import Mamba
 
 LRELU_SLOPE = 0.1
 
+
 def get_padding(kernel_size, dilation=1):
-    return int((kernel_size*dilation - dilation)/2)
+    return int((kernel_size * dilation - dilation) / 2)
+
 
 class Generator(torch.nn.Module):
     def __init__(self, h):
@@ -23,30 +25,35 @@ class Generator(torch.nn.Module):
         self.h = h
         self.conv_pre = weight_norm(Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3))
 
-        self.mamba = Mamba(
-            d_model=h.upsample_initial_channel,  # Соответствует input_dim Conformer
-            d_state=64,  # Размер скрытого состояния (SSM)
-            d_conv=31,  # Соответствует depthwise_conv_kernel_size=31 из Conformer
-            expand=2,  # Коэффициент расширения внутренних размерностей
-            bias=True  # Включить смещение для лучшей аппроксимации
-        )
+        self.num_mamba_layers = h.num_mamba_layers
+        self.mamba_layers = []
+        for idx in range(self.num_mamba_layers):
+            m = Mamba(
+                d_model=h.upsample_initial_channel,  # Соответствует input_dim Conformer
+                d_state=64,  # Размер скрытого состояния (SSM)
+                d_conv=31,  # Соответствует depthwise_conv_kernel_size=31 из Conformer
+                expand=2,  # Коэффициент расширения внутренних размерностей
+                bias=True,  # Включить смещение для лучшей аппроксимации
+                layer_idx=idx  # Задаём индекс слоя
+            )
+            self.mamba_layers.append(m)
 
         self.post_n_fft = h.gen_istft_n_fft
         self.conv_post = weight_norm(Conv1d(h.upsample_initial_channel, self.post_n_fft + 2, 7, 1, padding=3))
         self.conv_post.apply(init_weights)
 
-
-    def forward(self, x, length):
+    def forward(self, x, inference_params=None):
         # input 1 x 80 x time
-        #pre_conv
-        x = self.conv_pre(x) # 80 upsample to upsample_initial_channel
+        # pre_conv
+        x = self.conv_pre(x)  # 80 upsample to upsample_initial_channel
         # after conv pre 1 x 512 x time
         x = einops.rearrange(x, 'b f t -> b t f')
-        x, _ = self.mamba(x, length)
-        x = einops.rearrange(x, 'b t f -> b f t') #1 x 512 x time
+        for idx in range(self.num_mamba_layers):
+            x, _ = self.mamba_layers[idx](x, inference_params=inference_params)
+        x = einops.rearrange(x, 'b t f -> b f t')  # 1 x 512 x time
         x = F.leaky_relu(x)
         x = self.conv_post(x)  # 1 x 18 x time
-        spec = torch.exp(x[:,:self.post_n_fft // 2 + 1, :])
+        spec = torch.exp(x[:, :self.post_n_fft // 2 + 1, :])
         phase = torch.sin(x[:, self.post_n_fft // 2 + 1:, :])
 
         return spec, phase
@@ -55,6 +62,7 @@ class Generator(torch.nn.Module):
         print('Removing weight norm...')
         remove_weight_norm(self.conv_pre)
         remove_weight_norm(self.conv_post)
+
 
 class DiscriminatorP(torch.nn.Module):
     def __init__(self, period, kernel_size=5, stride=3, use_spectral_norm=False):
@@ -75,7 +83,7 @@ class DiscriminatorP(torch.nn.Module):
 
         # 1d to 2d
         b, c, t = x.shape
-        if t % self.period != 0: # pad first
+        if t % self.period != 0:  # pad first
             n_pad = self.period - (t % self.period)
             x = F.pad(x, (0, n_pad), "reflect")
             t = t + n_pad
@@ -167,8 +175,8 @@ class MultiScaleDiscriminator(torch.nn.Module):
         fmap_gs = []
         for i, d in enumerate(self.discriminators):
             if i != 0:
-                y = self.meanpools[i-1](y)
-                y_hat = self.meanpools[i-1](y_hat)
+                y = self.meanpools[i - 1](y)
+                y_hat = self.meanpools[i - 1](y_hat)
             y_d_r, fmap_r = d(y)
             y_d_g, fmap_g = d(y_hat)
             y_d_rs.append(y_d_r)
@@ -191,16 +199,15 @@ class SpecDiscriminator(nn.Module):
         self.window = getattr(torch, window)(win_length)
         self.discriminators = nn.ModuleList([
             norm_f(nn.Conv2d(1, 32, kernel_size=(3, 9), padding=(1, 4))),
-            norm_f(nn.Conv2d(32, 32, kernel_size=(3, 9), stride=(1,2), padding=(1, 4))),
-            norm_f(nn.Conv2d(32, 32, kernel_size=(3, 9), stride=(1,2), padding=(1, 4))),
-            norm_f(nn.Conv2d(32, 32, kernel_size=(3, 9), stride=(1,2), padding=(1, 4))),
-            norm_f(nn.Conv2d(32, 32, kernel_size=(3, 3), stride=(1,1), padding=(1, 1))),
+            norm_f(nn.Conv2d(32, 32, kernel_size=(3, 9), stride=(1, 2), padding=(1, 4))),
+            norm_f(nn.Conv2d(32, 32, kernel_size=(3, 9), stride=(1, 2), padding=(1, 4))),
+            norm_f(nn.Conv2d(32, 32, kernel_size=(3, 9), stride=(1, 2), padding=(1, 4))),
+            norm_f(nn.Conv2d(32, 32, kernel_size=(3, 3), stride=(1, 1), padding=(1, 1))),
         ])
 
         self.out = norm_f(nn.Conv2d(32, 1, 3, 1, 1))
 
     def forward(self, y):
-
         fmap = []
         with torch.no_grad():
             y = y.squeeze(1)
@@ -216,8 +223,8 @@ class SpecDiscriminator(nn.Module):
 
         return torch.flatten(y, 1, -1), fmap
 
-class MultiResSpecDiscriminator(torch.nn.Module):
 
+class MultiResSpecDiscriminator(torch.nn.Module):
     """From https://github.com/rishikksh20/UnivNet-pytorch/blob/f90c0123a04ed446093e245f164043db06dd8765/discriminator.py#L13"""
 
     def __init__(self,
@@ -225,13 +232,12 @@ class MultiResSpecDiscriminator(torch.nn.Module):
                  hop_sizes=[120, 240, 50],
                  win_lengths=[600, 1200, 240],
                  window="hann_window"):
-
         super(MultiResSpecDiscriminator, self).__init__()
         self.discriminators = nn.ModuleList([
             SpecDiscriminator(fft_sizes[0], hop_sizes[0], win_lengths[0], window),
             SpecDiscriminator(fft_sizes[1], hop_sizes[1], win_lengths[1], window),
             SpecDiscriminator(fft_sizes[2], hop_sizes[2], win_lengths[2], window)
-            ])
+        ])
 
     def forward(self, y, y_hat):
         y_d_rs = []
@@ -248,21 +254,23 @@ class MultiResSpecDiscriminator(torch.nn.Module):
 
         return y_d_rs, y_d_gs, fmap_rs, fmap_gs
 
+
 """CoMBD and SBD from https://github.com/ncsoft/avocodo/tree/main/avocodo/models"""
+
 
 class CoMBDBlock(torch.nn.Module):
     def __init__(
-        self,
-        h_u: List[int],
-        d_k: List[int],
-        d_s: List[int],
-        d_d: List[int],
-        d_g: List[int],
-        d_p: List[int],
-        op_f: int,
-        op_k: int,
-        op_g: int,
-        use_spectral_norm=False
+            self,
+            h_u: List[int],
+            d_k: List[int],
+            d_s: List[int],
+            d_d: List[int],
+            d_g: List[int],
+            d_p: List[int],
+            op_f: int,
+            op_k: int,
+            op_g: int,
+            use_spectral_norm=False
     ):
         super(CoMBDBlock, self).__init__()
         norm_f = weight_norm if use_spectral_norm is False else spectral_norm
@@ -316,15 +324,15 @@ class CoMBD(torch.nn.Module):
 
         self.blocks = nn.ModuleList()
         for _h_u, _d_k, _d_s, _d_d, _d_g, _d_p, _op_f, _op_k, _op_g in zip(
-            h["combd_h_u"],
-            h["combd_d_k"],
-            h["combd_d_s"],
-            h["combd_d_d"],
-            h["combd_d_g"],
-            h["combd_d_p"],
-            h["combd_op_f"],
-            h["combd_op_k"],
-            h["combd_op_g"],
+                h["combd_h_u"],
+                h["combd_d_k"],
+                h["combd_d_s"],
+                h["combd_d_d"],
+                h["combd_d_g"],
+                h["combd_d_p"],
+                h["combd_op_f"],
+                h["combd_op_k"],
+                h["combd_op_g"],
         ):
             self.blocks.append(CoMBDBlock(
                 _h_u,
@@ -385,15 +393,16 @@ class CoMBD(torch.nn.Module):
             ys, ys_hat)
         return outs_real, outs_fake, f_maps_real, f_maps_fake
 
+
 class MDC(torch.nn.Module):
     def __init__(
-        self,
-        in_channels,
-        out_channels,
-        strides,
-        kernel_size,
-        dilations,
-        use_spectral_norm=False
+            self,
+            in_channels,
+            out_channels,
+            strides,
+            kernel_size,
+            dilations,
+            use_spectral_norm=False
     ):
         super(MDC, self).__init__()
         norm_f = weight_norm if not use_spectral_norm else spectral_norm
@@ -435,13 +444,13 @@ class MDC(torch.nn.Module):
 
 class SBDBlock(torch.nn.Module):
     def __init__(
-        self,
-        segment_dim,
-        strides,
-        filters,
-        kernel_size,
-        dilations,
-        use_spectral_norm=False
+            self,
+            segment_dim,
+            strides,
+            filters,
+            kernel_size,
+            dilations,
+            use_spectral_norm=False
     ):
         super(SBDBlock, self).__init__()
         norm_f = weight_norm if not use_spectral_norm else spectral_norm
@@ -451,10 +460,10 @@ class SBDBlock(torch.nn.Module):
             filters_in_out.append([filters[i], filters[i + 1]])
 
         for _s, _f, _k, _d in zip(
-            strides,
-            filters_in_out,
-            kernel_size,
-            dilations
+                strides,
+                filters_in_out,
+                kernel_size,
+                dilations
         ):
             self.convs.append(MDC(
                 in_channels=_f[0],
@@ -512,12 +521,12 @@ class SBD(torch.nn.Module):
         self.discriminators = torch.nn.ModuleList()
 
         for _f, _k, _d, _s, _br, _tr in zip(
-            self.config.filters,
-            self.config.kernel_sizes,
-            self.config.dilations,
-            self.config.strides,
-            self.config.band_ranges,
-            self.config.transpose
+                self.config.filters,
+                self.config.kernel_sizes,
+                self.config.dilations,
+                self.config.strides,
+                self.config.band_ranges,
+                self.config.transpose
         ):
             if _tr:
                 segment_dim = self.config.segment_size // _br[1] - _br[0]
@@ -545,9 +554,9 @@ class SBD(torch.nn.Module):
             y_hat_in_f = self.f_pqmf.analysis(y_hat)
 
         for d, br, tr in zip(
-            self.discriminators,
-            self.config.band_ranges,
-            self.config.transpose
+                self.discriminators,
+                self.config.band_ranges,
+                self.config.transpose
         ):
             if tr:
                 _y_in = y_in_f[:, br[0]:br[1], :]
