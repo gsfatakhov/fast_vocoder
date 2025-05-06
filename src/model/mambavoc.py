@@ -55,19 +55,19 @@ class DiscriminatorModel(nn.Module):
 
 
 class MambaVoc(GanBaseModel):
-    def __init__(self, generator_params, discriminator_params, mel_config):
+    def __init__(self, generator_params, discriminator_params, mel_config, inference_params=None):
         generator = Generator(**generator_params)
         discriminator = DiscriminatorModel(**discriminator_params)
 
         super().__init__(generator, discriminator)
 
         self.mel_extractor = MelSpectrogram(mel_config)
+        self.inference_params = inference_params
 
     def forward(self, **batch):
         x = batch["mel"]
-        length = batch["length"]
 
-        spec, phase = self.generator(x, length)
+        spec, phase = self.generator(x, inference_params=self.inference_params)
 
         batch["pred_audio"] = self.mel_extractor.inverse(spec, phase).unsqueeze(1)
 
