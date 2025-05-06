@@ -1,6 +1,6 @@
 defaults:
   - model: mambavoc
-  - writer: wandb_lightvoc
+  - writer: wandb_mambavoc
   - metrics: tts
   - datasets: hifigan_paper
   - transforms: empty
