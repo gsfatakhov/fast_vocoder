@@ -19,7 +19,7 @@ def get_padding(kernel_size, dilation=1):
 
 
 class Generator(torch.nn.Module):
-    def __init__(self, h, mel_config):
+    def __init__(self, h, mel_configs):
         super(Generator, self).__init__()
         self.h = h
         self.num_upsamples = len(h.upsample_rates)
@@ -37,6 +37,7 @@ class Generator(torch.nn.Module):
 
         self.mamba_layers = nn.ModuleList()
         self.conv_post = nn.ModuleList()
+        self.mel_extractors = nn.ModuleList()
         for i in range(self.num_upsamples):
             # ch = h.upsample_initial_channel // (2 ** (i + 1))
 
@@ -60,10 +61,10 @@ class Generator(torch.nn.Module):
             else:
                 self.conv_post.append(torch.nn.Identity())
 
+            self.mel_extractors.append(MelSpectrogram(mel_configs[i]))
+
         self.ups.apply(init_weights)
         self.conv_post.apply(init_weights)
-
-        self.mel_extractor = MelSpectrogram(mel_config)
 
     def forward(self, x, inference_params=None):
         # input 1 x 80 x time
@@ -73,7 +74,7 @@ class Generator(torch.nn.Module):
         self.mamba_layers.to(x.device)
 
         outs = []
-        for i, (ups, mamba_layer, conv_post) in enumerate(zip(self.ups, self.mamba_layers, self.conv_post)):
+        for i, (ups, mamba_layer, conv_post, mel_extractor) in enumerate(zip(self.ups, self.mamba_layers, self.conv_post, self.mel_extractors)):
             x = F.leaky_relu(x, LRELU_SLOPE) # in avocodo use 0.2 slope
             for _ups in ups:
                 x = _ups(x)
@@ -86,12 +87,12 @@ class Generator(torch.nn.Module):
                 _x = F.leaky_relu(x)
                 _x = conv_post(_x)
 
-                _spec = torch.exp(_x[:, :self.post_n_fft // 2 + 1, :])
-                _phase = torch.sin(_x[:, self.post_n_fft // 2 + 1:, :])
+                post_n_fft = _x.shape[1] // 2
+                _spec = torch.exp(_x[:, :post_n_fft, :])
+                _phase = torch.sin(_x[:, post_n_fft:, :])
 
-                _audio = self.mel_extractor.inverse(_spec, _phase)
+                _audio = mel_extractor.inverse(_spec, _phase).unsqueeze(1)  # b x 1 x time
 
-                _audio = torch.tanh(_audio)
                 outs.append(_audio)
             else: # only in first layer
                 x = conv_post(x) # identity
