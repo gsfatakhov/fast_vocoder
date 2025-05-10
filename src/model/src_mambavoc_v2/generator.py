@@ -9,6 +9,8 @@ from src.model.src_lightvoc.utils import init_weights
 
 from src.utils.mel import MelSpectrogram
 
+from mamba_ssm import Mamba
+
 LRELU_SLOPE = 0.1
 
 
@@ -20,6 +22,7 @@ class Generator(torch.nn.Module):
     def __init__(self, h, mel_config):
         super(Generator, self).__init__()
         self.h = h
+        self.num_upsamples = len(h.upsample_rates)
         self.conv_pre = weight_norm(Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3))
 
         self.ups = nn.ModuleList()
@@ -36,6 +39,16 @@ class Generator(torch.nn.Module):
         self.conv_post = nn.ModuleList()
         for i in range(self.num_upsamples):
             # ch = h.upsample_initial_channel // (2 ** (i + 1))
+
+            m = Mamba(
+                d_model=h.upsample_initial_channel,  # Соответствует input_dim Conformer
+                d_state=64,  # Размер скрытого состояния (SSM)
+                d_conv=4,  # Соответствует depthwise_conv_kernel_size=31 из Conformer
+                expand=2,  # Коэффициент расширения внутренних размерностей
+                bias=False,  # Включить смещение для лучшей аппроксимации
+                layer_idx=i  # Задаём индекс слоя
+            )
+            self.mamba_layers.append(m)
 
             if self.h.projection_filters[i] != 0:
                 self.conv_post.append(
@@ -69,7 +82,7 @@ class Generator(torch.nn.Module):
             x = mamba_layer(x, inference_params=inference_params)
             x = einops.rearrange(x, 'b t f -> b f t')  # 1 x 512 x time
 
-            if i >= (self.num_upsamples - 3) and inference_params is None:
+            if inference_params is None:
                 _x = F.leaky_relu(x)
                 _x = conv_post(_x)
 

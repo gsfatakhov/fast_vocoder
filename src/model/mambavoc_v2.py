@@ -44,7 +44,7 @@ class DiscriminatorModel(nn.Module):
         }
 
 
-class LightVocV2(GanBaseModel):
+class MambaVocV2(GanBaseModel):
     def __init__(self, generator_params, discriminator_params, ):
         generator = Generator(**generator_params)
         discriminator = DiscriminatorModel(**discriminator_params)
