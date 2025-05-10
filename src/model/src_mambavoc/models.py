@@ -25,15 +25,14 @@ class Generator(torch.nn.Module):
         self.h = h
         self.conv_pre = weight_norm(Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3))
 
-        self.num_mamba_layers = h.num_mamba_layers
-        self.mamba_layers = []
-        for idx in range(self.num_mamba_layers):
+        self.mamba_layers = nn.ModuleList()
+        for idx in range(h.num_mamba_layers):
             m = Mamba(
                 d_model=h.upsample_initial_channel,  # Соответствует input_dim Conformer
                 d_state=64,  # Размер скрытого состояния (SSM)
-                d_conv=31,  # Соответствует depthwise_conv_kernel_size=31 из Conformer
+                d_conv=4,  # Соответствует depthwise_conv_kernel_size=31 из Conformer
                 expand=2,  # Коэффициент расширения внутренних размерностей
-                bias=True,  # Включить смещение для лучшей аппроксимации
+                bias=False,  # Включить смещение для лучшей аппроксимации
                 layer_idx=idx  # Задаём индекс слоя
             )
             self.mamba_layers.append(m)
@@ -48,8 +47,10 @@ class Generator(torch.nn.Module):
         x = self.conv_pre(x)  # 80 upsample to upsample_initial_channel
         # after conv pre 1 x 512 x time
         x = einops.rearrange(x, 'b f t -> b t f')
-        for idx in range(self.num_mamba_layers):
-            x, _ = self.mamba_layers[idx](x, inference_params=inference_params)
+        self.mamba_layers.to(x.device)
+        for layer in self.mamba_layers:
+            # print(self.mamba_layers[idx].device)
+            x = layer(x, inference_params=inference_params)
         x = einops.rearrange(x, 'b t f -> b f t')  # 1 x 512 x time
         x = F.leaky_relu(x)
         x = self.conv_post(x)  # 1 x 18 x time
