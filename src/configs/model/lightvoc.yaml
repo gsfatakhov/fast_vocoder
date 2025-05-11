@@ -36,8 +36,14 @@ discriminator_params:
         fsbd: [ 64, 256, 0.1, 9.0 ]
       segment_size: 8192
 
-stft_params:
-  filter_length: 1024
-  hop_length: 256
+mel_config:
+  _target_: src.utils.MelSpectrogramConfig
+  sr: 22050
   win_length: 1024
-  device: "cuda"
+  hop_length: 256
+  n_fft: 1024
+  f_min: 0
+  f_max: 8000
+  n_mels: 80
+  power: 1.0
+  pad_value: -11.5129251
