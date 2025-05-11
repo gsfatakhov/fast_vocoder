@@ -1,19 +1,22 @@
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
-from torch.nn import Conv1d, AvgPool1d, Conv2d
+from torch.nn import Conv1d, AvgPool1d, Conv2d, LayerNorm
 from torch.nn.utils import weight_norm, remove_weight_norm, spectral_norm
 import einops
 from typing import List
 
 from src.model.src_lightvoc.stft import stft
 from src.model.src_lightvoc.pqmf import PQMF
-from src.model.src_lightvoc.utils import init_weights, get_padding
+from src.model.src_lightvoc.utils import get_padding
 
 from mamba_ssm import Mamba
 
 LRELU_SLOPE = 0.1
 
+def init_weights_smaller(m):
+    if isinstance(m, nn.Conv1d):
+        nn.init.xavier_uniform_(m.weight, gain=0.01)  # Меньший gain
 
 def get_padding(kernel_size, dilation=1):
     return int((kernel_size * dilation - dilation) / 2)
@@ -25,22 +28,28 @@ class Generator(torch.nn.Module):
         self.h = h
         self.conv_pre = weight_norm(Conv1d(80, h.upsample_initial_channel, 7, 1, padding=3))
 
-        self.num_mamba_layers = h.num_mamba_layers
-        self.mamba_layers = []
-        for idx in range(self.num_mamba_layers):
+        self.mamba_layers = nn.ModuleList()
+        self.layer_norms = nn.ModuleList()
+        for idx in range(h.num_mamba_layers):
             m = Mamba(
                 d_model=h.upsample_initial_channel,  # Соответствует input_dim Conformer
                 d_state=64,  # Размер скрытого состояния (SSM)
-                d_conv=31,  # Соответствует depthwise_conv_kernel_size=31 из Conformer
+                d_conv=4,  # Соответствует depthwise_conv_kernel_size=31 из Conformer
                 expand=2,  # Коэффициент расширения внутренних размерностей
-                bias=True,  # Включить смещение для лучшей аппроксимации
+                bias=False,  # Включить смещение для лучшей аппроксимации
                 layer_idx=idx  # Задаём индекс слоя
             )
             self.mamba_layers.append(m)
+            self.layer_norms.append(LayerNorm(h.upsample_initial_channel))
 
         self.post_n_fft = h.gen_istft_n_fft
         self.conv_post = weight_norm(Conv1d(h.upsample_initial_channel, self.post_n_fft + 2, 7, 1, padding=3))
-        self.conv_post.apply(init_weights)
+        self.conv_post.apply(init_weights_smaller)
+
+    def to(self, device):
+        super().to(device)
+        self.mamba_layers = self.mamba_layers.to(device)
+        return self
 
     def forward(self, x, inference_params=None):
         # input 1 x 80 x time
@@ -48,10 +57,13 @@ class Generator(torch.nn.Module):
         x = self.conv_pre(x)  # 80 upsample to upsample_initial_channel
         # after conv pre 1 x 512 x time
         x = einops.rearrange(x, 'b f t -> b t f')
-        for idx in range(self.num_mamba_layers):
-            x, _ = self.mamba_layers[idx](x, inference_params=inference_params)
+        for mamba, layer_norm in zip(self.mamba_layers, self.layer_norms):
+            x = layer_norm(x)
+            x = F.leaky_relu(x, LRELU_SLOPE)
+            x = mamba(x, inference_params=inference_params)
         x = einops.rearrange(x, 'b t f -> b f t')  # 1 x 512 x time
         x = F.leaky_relu(x)
+
         x = self.conv_post(x)  # 1 x 18 x time
         spec = torch.exp(x[:, :self.post_n_fft // 2 + 1, :])
         phase = torch.sin(x[:, self.post_n_fft // 2 + 1:, :])

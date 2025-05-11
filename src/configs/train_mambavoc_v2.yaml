@@ -1,11 +1,11 @@
 defaults:
-  - model: mambavoc
+  - model: mambavoc_v2
   - writer: wandb_mambavoc
   - metrics: tts
   - datasets: hifigan_paper
   - transforms: empty
   - dataloader: train
-  - loss_function: lightvoc
+  - loss_function: mambavoc_v2
   - _self_
 gen_optimizer:
   _target_: torch.optim.AdamW
@@ -31,7 +31,7 @@ mel_extractor: # do not need this, just for comp
     hop_length: 256
     n_fft: 1024
     f_min: 0
-    f_max: 8000
+    f_max: null
     n_mels: 80
     power: 1.0
     pad_value: -11.5129251
@@ -49,4 +49,4 @@ trainer:
   early_stop: ${trainer.n_epochs} # epochs for early stopping
   save_dir: "saved"
   seed: 42
-  max_grad_norm: 1000
+  max_grad_norm: null
