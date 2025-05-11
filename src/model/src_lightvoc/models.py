@@ -37,7 +37,6 @@ class Generator(torch.nn.Module):
         x, _ = self.conformer(x, length)
         x = einops.rearrange(x, 'b t f -> b f t') #1 x 512 x time
         x = F.leaky_relu(x)
-        x = self.reflection_pad(x)
         x = self.conv_post(x)  # 1 x 18 x time
         spec = torch.exp(x[:,:self.post_n_fft // 2 + 1, :])
         phase = torch.sin(x[:, self.post_n_fft // 2 + 1:, :])
