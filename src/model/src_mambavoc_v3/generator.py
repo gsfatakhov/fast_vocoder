@@ -70,7 +70,7 @@ class MambaBlocks(torch.nn.Module):
 
         for mamba, layer_norm in zip(self.mamba_layers, self.layer_norms):
             y = layer_norm(x)
-            # y = mamba(y, inference_params=inference_params)
+            y = mamba(y, inference_params=inference_params)
             x = x + y
 
         x = einops.rearrange(x, 'b t f -> b f t')  # 1 x 512 x time
@@ -121,7 +121,6 @@ class Generator(torch.nn.Module):
         # after conv pre 1 x 512 x time
 
         for i in range(self.num_upsamples):
-            print(x.shape)
             x = F.leaky_relu(x, LRELU_SLOPE)
             x = self.ups[i](x)
 
