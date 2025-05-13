@@ -3,6 +3,8 @@ import torch.nn.functional as F
 import torch.nn as nn
 from torch.nn.utils import weight_norm, spectral_norm
 
+from src.model.src_lightvoc.stft import stft
+
 LRELU_SLOPE = 0.1
 
 
@@ -31,7 +33,7 @@ class SpecDiscriminator(nn.Module):
         fmap = []
         with torch.no_grad():
             y = y.squeeze(1)
-            # y = stft(y, self.fft_size, self.shift_size, self.win_length, self.window.to(y.get_device()))
+            y = stft(y, self.fft_size, self.shift_size, self.win_length, self.window.to(y.get_device()))
         y = y.unsqueeze(1)
         for i, d in enumerate(self.discriminators):
             y = d(y)
