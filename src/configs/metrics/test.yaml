@@ -7,3 +7,9 @@ inference: # metrics that are calculated during inference (eval)
     device: ${metrics.device}
     name: "STOI"
     group_size: 1
+  - _target_: src.metrics.LSD
+    device: ${metrics.device}
+    name: "LSD"
+    n_fft: 1024
+    hop_length: 256
+    win_length: 1024

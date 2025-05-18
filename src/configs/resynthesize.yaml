@@ -27,8 +27,11 @@ datasets:
       n_mels: 80
       power: 1.0
       pad_value: -11.5129251
+    calc_mel_for_loss: True
+    fmax_loss: null
+    n_cache_reuse: 0
 inferencer:
-  device_tensors: ["audio", "mel"] # which tensors should be on device (ex. GPU)
+  device_tensors: ["audio", "mel", "mel_for_loss", "length"] # which tensors should be on device (ex. GPU)
   device: "auto" # device name or "auto"
   save_path: "resynthesize_results" # any name here, can be a dataset name
   seed: 42
