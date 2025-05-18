@@ -1,10 +1,25 @@
 ## About
 
-This repository contains an implementation of HiFiGAN.
+This repository contains an a code of project "Vocoders for Text–to–Speech With GANs".
 
+### Abstract
+This paper explores strategies for accelerating GAN-based~\cite{gan} vocoders in text-to-speech systems, with a focus on optimizing inference speed without sacrificing audio quality. Building on established baselines such as HiFiGAN~\cite{hifigan} and LightVoc~\cite{lightvoc}, our work investigates architectural modifications and optimization techniques aimed specifically at reducing computation time. One possible approach to accelerating vocoders involves integrating state space models (SSMs~\cite{ssm}), particularly the Mamba framework~\cite{mamba}, to enhance processing efficiency. The study includes planned extensive experiments and evaluations—including both objective measurements and subjective listening tests—to assess the performance of our accelerated vocoders in terms of latency and audio fidelity compared to traditional GAN~\cite{gan} implementations. This work aims to achieve results that enable high-speed, real-time text-to-speech applications.
+
+
+
+
+### Preavious HiFiGAN experiments
 Best weights for model available: [here](https://disk.yandex.ru/d/DHq4RWzdd6x7DA)
-
 Report on the completed work: [here](./report/report.md)
+
+### Сurrent experiments
+
+Wand Project: [here](https://wandb.ai/gsfatakhov-hse/TTS)
+
+HiFiGAN weights:  [here](https://disk.yandex.ru/d/aqxgvqTKz0TRjA)
+LightVoc weights: [here](https://disk.yandex.ru/d/New9Z6iowMRcgw)
+MambaVocV3 weights: [here](https://disk.yandex.ru/d/nlR0FjgK5DTM5Q)
+
 ## Installation
 
 The general steps are the following:
