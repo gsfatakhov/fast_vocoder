@@ -3,6 +3,7 @@ import warnings
 import hydra
 import torch
 from hydra.utils import instantiate
+import time
 
 from src.datasets.data_utils import get_dataloaders
 from src.trainer import Inferencer
@@ -55,13 +56,16 @@ def main(config):
         skip_model_load=False,
     )
 
+    start = time.perf_counter()
     logs = inferencer.run_inference()
+    end = time.perf_counter()
 
     for part in logs.keys():
         for key, value in logs[part].items():
             full_key = part + "_" + key
             print(f"    {full_key:15s}: {value}")
     print("Results saved to:", save_path)
+    print(f"Time of generation: {end - start:.6f} sec")
 
 
 if __name__ == "__main__":
