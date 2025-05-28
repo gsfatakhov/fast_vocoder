@@ -138,7 +138,7 @@ class LJSpeechDataset(BaseDataset):
 
         if self.mel_config:
             instance_data["mel"] = self.mel_extractor(audio_tensor)  # [B, n_mels, T']
-            instance_data["length"] = length_mel
+            instance_data["length"] = length_mel / self.target_sr
             instance_data["wav_length"] = audio_tensor.shape[-1]
             if self.calc_mel_for_loss:
                 instance_data["mel_for_loss"] = self.loss_mel_extractor(audio_tensor)
