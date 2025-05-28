@@ -32,6 +32,9 @@ class LSD(BaseMetric):
         audio = audio.to(self.device)
         pred_audio = pred_audio.to(self.device)
 
+        audio = audio.squeeze(1)
+        pred_audio = pred_audio.squeeze(1)
+
         min_len = min(audio.shape[-1], pred_audio.shape[-1])
         audio = audio[..., :min_len]
         pred_audio = pred_audio[..., :min_len]
