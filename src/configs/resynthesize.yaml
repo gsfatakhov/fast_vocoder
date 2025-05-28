@@ -36,3 +36,4 @@ inferencer:
   save_path: "resynthesize_results" # any name here, can be a dataset name
   seed: 42
   from_pretrained: "/Users/georgijfatahov/Downloads/lightvoc_176bs_server/model_best.pth" # path to the pretrained model
+  warmup_steps: 0

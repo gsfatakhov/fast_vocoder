@@ -5,6 +5,8 @@ from tqdm.auto import tqdm
 from src.metrics.tracker import MetricTracker
 from src.trainer.base_trainer import BaseTrainer
 
+import time
+
 
 class Inferencer(BaseTrainer):
     def __init__(
@@ -17,6 +19,7 @@ class Inferencer(BaseTrainer):
             metrics=None,
             batch_transforms=None,
             skip_model_load=False,
+            warmup_n=0,
     ):
         assert (
                 skip_model_load or config.inferencer.get("from_pretrained") is not None
@@ -46,10 +49,17 @@ class Inferencer(BaseTrainer):
         if not skip_model_load:
             self._from_pretrained(config.inferencer.get("from_pretrained"))
 
+        self.warmup_n = warmup_n
+        self.warmup_counter = 0
+
+        self.gen_time = 0
+        self.inp_time = 0
+
     def run_inference(self):
         part_logs = {}
         for part, dataloader in self.evaluation_dataloaders.items():
             logs = self._inference_part(part, dataloader)
+            logs["RTFX"] = self.inp_time / self.gen_time
             part_logs[part] = logs
         return part_logs
 
@@ -57,14 +67,25 @@ class Inferencer(BaseTrainer):
         batch = self.move_batch_to_device(batch)
         batch = self.transform_batch(batch)
 
-        outputs = self.model(**batch)
+        batch_size = batch["audio"].shape[0]
+
+        if self.warmup_counter >= self.warmup_n:
+            start = time.perf_counter()
+            outputs = self.model(**batch)
+            end = time.perf_counter()
+
+            self.gen_time += end - start
+            self.inp_time += batch["wav_length"] * batch_size
+
+        else:
+            self.warmup_counter += 1
+            outputs = self.model(**batch)
+
         batch.update(outputs)
 
         if metrics is not None:
             for met in self.metrics["inference"]:
                 metrics.update(met.name, met(**batch))
-
-        batch_size = batch["audio"].shape[0]
 
         sr = 22050
 
