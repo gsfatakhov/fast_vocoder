@@ -3,21 +3,41 @@
 This repository contains an a code of project "Vocoders for Text–to–Speech With GANs".
 
 ### Abstract
-This paper explores strategies for accelerating GAN-based~\cite{gan} vocoders in text-to-speech systems, with a focus on optimizing inference speed without sacrificing audio quality. Building on established baselines such as HiFiGAN~\cite{hifigan} and LightVoc~\cite{lightvoc}, our work investigates architectural modifications and optimization techniques aimed specifically at reducing computation time. One possible approach to accelerating vocoders involves integrating state space models (SSMs~\cite{ssm}), particularly the Mamba framework~\cite{mamba}, to enhance processing efficiency. The study includes planned extensive experiments and evaluations—including both objective measurements and subjective listening tests—to assess the performance of our accelerated vocoders in terms of latency and audio fidelity compared to traditional GAN~\cite{gan} implementations. This work aims to achieve results that enable high-speed, real-time text-to-speech applications.
+This paper explores strategies for accelerating GAN-based vocoders in text-to-speech systems, with a focus on optimizing inference speed without sacrificing audio quality. Building on established baselines such as HiFiGAN and LightVoc, our work investigates architectural modifications and optimization techniques aimed specifically at reducing computation time. One possible approach to accelerating vocoders involves integrating state space models (SSMs), particularly the Mamba framework, to enhance processing efficiency. The study includes planned extensive experiments and evaluations-including both objective measurements and subjective listening tests-to assess the performance of our accelerated vocoders in terms of latency and audio fidelity compared to traditional GAN implementations. This work aims to achieve results that enable high-speed, real-time text-to-speech applications.
 
 
+### Obtained results
+<img width="1191" height="655" alt="image" src="https://github.com/user-attachments/assets/02b5a8e9-eea1-49ec-8179-2c4d596444ac" />
+
+### MambavocV1
+
+Simple architecture. Experiments with hidden dimension, discriminators setup and [normalization](https://openreview.net/forum?id=YK8eO7BEkJ) (post/pred) relatively.
+<img width="1191" height="655" alt="image" src="https://github.com/user-attachments/assets/497d4bce-6e16-45c9-9048-55277a377cf1" />
+### MambavocV2
+
+Upsampling architecture. [Collaborative mechanizm](https://arxiv.org/abs/2206.13404)
+<img width="1191" height="655" alt="image" src="https://github.com/user-attachments/assets/1013c71c-0bc0-4ad1-a0b2-82b031d40f0e" />
+
+### MambavocV3
+Combination of SSM, LN, Resblock. [Inspiration](inspiration)
+<img width="1191" height="655" alt="image" src="https://github.com/user-attachments/assets/e550867d-be6f-4339-81e9-13715c034c19" />
+
+### Baselines implementation
+LoghtVoc did not converged to desired metrics
+<img width="1191" height="655" alt="image" src="https://github.com/user-attachments/assets/5f8917e6-fd42-43b1-89a3-d4f681845a5d" />
 
 
-### Preavious HiFiGAN experiments
-Best weights for model available: [here](https://disk.yandex.ru/d/DHq4RWzdd6x7DA)
-Report on the completed work: [here](./report/report.md)
-
-### Сurrent experiments
+### Experiments links
 
 Wand Project: [here](https://wandb.ai/gsfatakhov-hse/TTS)
 
+
 HiFiGAN weights:  [here](https://disk.yandex.ru/d/aqxgvqTKz0TRjA)
+
+
 LightVoc weights: [here](https://disk.yandex.ru/d/New9Z6iowMRcgw)
+
+
 MambaVocV3 weights: [here](https://disk.yandex.ru/d/nlR0FjgK5DTM5Q)
 
 ## Installation
@@ -114,6 +134,10 @@ You get `single_utterance.wav` in the `results` folder.
 ## Other fearures
 
 [Dataset](https://keithito.com/LJ-Speech-Dataset/)
+
+### Preavious HiFiGAN experiments
+Best weights for model available: [here](https://disk.yandex.ru/d/DHq4RWzdd6x7DA)
+Report on the completed work: [here](./report/report.md)
 
 ## Credits
 
